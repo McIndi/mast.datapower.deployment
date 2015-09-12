@@ -872,7 +872,6 @@ def postdeploy(appliances=[], credentials=[], timeout=120,
         return output, history
 
 
-@logged('mast.datapower.deployment')
 def get_data_file(f):
     _root = os.path.dirname(__file__)
     path = os.path.join(_root, "data", f)

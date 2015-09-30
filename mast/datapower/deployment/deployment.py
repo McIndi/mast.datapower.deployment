@@ -424,53 +424,6 @@ def predeploy(
                 output += resp
                 history += hist
 
-        ## Quiesce Domain
-        #if quiesce_domain:
-            #logger.info(
-                #"Quiescing domain {} before deployment at {}".format(
-                    #Domain, str(Timestamp())))
-
-            #resp, hist = system.quiesce_domain(
-                #appliance.hostname,
-                #credentials,
-                #timeout,
-                #Domain,
-                #quiesce_timeout,
-                #web=web)
-
-            #logger.info(
-                #"Finished quiescing domain {} before deployment at {}".format(
-                    #Domain, str(Timestamp())))
-
-            #sleep(quiesce_timeout)
-
-            #if web:
-                #output += resp
-                #history += hist
-
-        ## Quiesce Appliance
-        #if quiesce_appliance:
-            #logger.info(
-                #"Quiescing appliances before deployment at {}".format(
-                    #str(Timestamp())))
-
-            #resp, hist = system.quiesce_appliance(
-                #appliance.hostname,
-                #credentials,
-                #timeout,
-                #quiesce_timeout,
-                #web=web)
-
-            #logger.info(
-                #"Finished quiescing appliances before deployment at {}".format(
-                    #str(Timestamp())))
-
-            #sleep(quiesce_timeout)
-
-            #if web:
-                #output += resp
-                #history += hist
-
     if web:
         return output, history
 
@@ -617,15 +570,15 @@ def deploy(
 """
 
     if web:
-        from mast.backups import set_checkpoint, get_normal_backup, get_secure_backup
-        import mast.system as system
-        from mast.developer import _import
+        from mast.datapower.backups import set_checkpoint, get_normal_backup, get_secure_backup
+        import mast.datapower.system as system
+        from mast.datapower.developer import _import
     else:
         #lint:disable
-        from mast.backups import set_checkpoint
-        from mast.backups import get_normal_backup, get_secure_backup
-        import mast.system as system
-        from mast.developer import _import
+        from mast.datapower.backups import set_checkpoint
+        from mast.datapower.backups import get_normal_backup, get_secure_backup
+        import mast.datapower.system as system
+        from mast.datapower.developer import _import
         #lint:enable
 
     if web:
@@ -802,10 +755,10 @@ def postdeploy(appliances=[], credentials=[], timeout=120,
    * save_config - Whether to save the configuration in the specified
    domain."""
     if web:
-        import mast.system as system
+        import mast.datapower.system as system
     else:
         #lint:disable
-        import mast.system as system
+        import mast.datapower.system as system
         #lint:enable
 
     check_hostname = not no_check_hostname
@@ -815,41 +768,6 @@ def postdeploy(appliances=[], credentials=[], timeout=120,
         output = ""
         history = ""
     for appliance in env.appliances:
-
-        #if unquiesce_domain:
-            #appliance.log_info("Attempting to unquiesce domain")
-
-            #resp, hist = system.unquiesce_domain(
-                #appliance.hostname,
-                #credentials,
-                #timeout,
-                #Domain,
-                #web=web)
-
-            #appliance.log_info("Finished unquiescing domain")
-
-            #if web:
-                #output += resp
-                #history += hist
-
-        #if unquiesce_appliance:
-            #logger.info(
-                #"Quiescing appliances before deployment at {}".format(
-                    #str(Timestamp())))
-
-            #resp, hist = system.unquiesce_appliance(
-                #appliance.hostname,
-                #credentials,
-                #timeout,
-                #web=web)
-
-            #logger.info(
-                #"Finished quiescing appliances before deployment at {}".format(
-                    #str(Timestamp())))
-
-            #if web:
-                #output += resp
-                #history += hist
 
         if save_config:
             appliance.log_info(

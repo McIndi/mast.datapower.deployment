@@ -313,13 +313,13 @@ def predeploy(
         checkpoint from the domain IF AND ONLY IF the maximum number
         of checkpoints has been reached."""
     if web:
-        from mast.backups import set_checkpoint, get_normal_backup, get_secure_backup
-        import mast.system as system
+        from mast.datapower.backups import set_checkpoint, get_normal_backup, get_secure_backup
+        import mast.datapower.system as system
     else:
         #lint:disable
-        from mast.backups import set_checkpoint
-        from mast.backups import get_normal_backup, get_secure_backup
-        import mast.system as system
+        from mast.datapower.backups import set_checkpoint
+        from mast.datapower.backups import get_normal_backup, get_secure_backup
+        import mast.datapower.system as system
         #lint:enable
 
     check_hostname = not no_check_hostname

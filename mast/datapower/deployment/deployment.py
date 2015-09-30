@@ -46,7 +46,7 @@ the filename ie. local:/test.txt**
 @cli.command('get-file', category='file management')
 def get_file(appliances=[], credentials=[], timeout=120,
              location=None, Domain='default', out_dir='tmp', no_check_hostname=False, web=False):
-    """Uploads a file to the specified appliances
+    """retrieves a file from the specified appliances
 
 Parameters:
 
@@ -82,6 +82,16 @@ save the file to"""
 def delete_file(appliances=[], credentials=[], timeout=120,
     Domain="", filename="", backup=False, out_dir="tmp",
     no_check_hostname=False, web=False):
+    """Deletes a file from the specified appliances
+
+Parameters:
+
+* filename - The name of the file (on DataPower) you would
+like to delete
+* Domain - The domain from which to delete the file
+* backup - Whether to backup the file before deleting
+* out-dir - (NOT NEEDED IN THE WEB GUI)The directory you would like to
+save the file to"""
     check_hostname = not no_check_hostname
     env = datapower.Environment(appliances, credentials, timeout, check_hostname=check_hostname)
     if backup:

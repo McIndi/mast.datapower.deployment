@@ -757,7 +757,8 @@ def deploy(
 @logged('mast.datapower.deployment')
 @cli.command('postdeploy', category='deployment')
 def postdeploy(appliances=[], credentials=[], timeout=120,
-    Domain="", save_config=True, no_check_hostname=False, web=True):
+               Domain="", save_config=True,
+               no_check_hostname=False, web=True):
     """This is a simple script which will allow you to unquiesce
    your domain or appliances after you quiesce them for a deployment.
    Also this will allow you to save the config.
@@ -769,12 +770,14 @@ def postdeploy(appliances=[], credentials=[], timeout=120,
     if web:
         import mast.datapower.system as system
     else:
-        #lint:disable
         import mast.datapower.system as system
-        #lint:enable
 
     check_hostname = not no_check_hostname
-    env = datapower.Environment(appliances, credentials, timeout, check_hostname=check_hostname)
+    env = datapower.Environment(
+        appliances,
+        credentials,
+        timeout,
+        check_hostname=check_hostname)
 
     if web:
         output = ""
@@ -786,14 +789,15 @@ def postdeploy(appliances=[], credentials=[], timeout=120,
                 "Attempting to save configuration after deployment")
 
             resp, hist = system.save_config(
-                appliance.hostname,
-                credentials,
+                [appliance.hostname],
+                [credentials],
                 timeout,
                 Domain,
                 no_check_hostname=no_check_hostname,
                 web=web)
 
-            appliance.log_info("Finished saving configuration after deployment")
+            appliance.log_info(
+                "Finished saving configuration after deployment")
 
             if web:
                 output += resp

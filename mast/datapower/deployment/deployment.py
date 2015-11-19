@@ -1,18 +1,22 @@
 # -*- coding: utf-8 -*-
-from mast.datapower.system import clean_up
-from mast.datapower import datapower
-import mast.plugin_utils.plugin_utils as util
-from mast.timestamp import Timestamp
-from time import sleep
-from mast.logging import make_logger, logged
-import commandr
-import flask
-import sys
 import os
+import sys
+import flask
+import commandr
+from time import sleep
+from mast.datapower import datapower
+from mast.plugins.web import Plugin
+from mast.timestamp import Timestamp
+from mast.logging import make_logger, logged
+from functools import partial, update_wrapper
+import mast.plugin_utils.plugin_utils as util
+import mast.plugin_utils.plugin_functions as pf
+
 
 logger = make_logger('mast.datapower.deployment')
 
 cli = commandr.Commandr()
+
 
 @logged('mast.datapower.deployment')
 @cli.command('set-file', category='file management')
@@ -29,7 +33,11 @@ once uploaded to the DataPower **NOTE: file_out should contain
 the filename ie. local:/test.txt**
 * Domain - The domain to which to upload the file"""
     check_hostname = not no_check_hostname
-    env = datapower.Environment(appliances, credentials, timeout, check_hostname=check_hostname)
+    env = datapower.Environment(
+        appliances,
+        credentials,
+        timeout,
+        check_hostname=check_hostname)
     kwargs = {
         'file_in': file_in,
         'file_out': destination,
@@ -45,7 +53,8 @@ the filename ie. local:/test.txt**
 @logged('mast.datapower.deployment')
 @cli.command('get-file', category='file management')
 def get_file(appliances=[], credentials=[], timeout=120,
-             location=None, Domain='default', out_dir='tmp', no_check_hostname=False, web=False):
+             location=None, Domain='default', out_dir='tmp',
+             no_check_hostname=False, web=False):
     """retrieves a file from the specified appliances
 
 Parameters:
@@ -58,7 +67,11 @@ save the file to"""
 
     t = Timestamp()
     check_hostname = not no_check_hostname
-    env = datapower.Environment(appliances, credentials, timeout, check_hostname=check_hostname)
+    env = datapower.Environment(
+        appliances,
+        credentials,
+        timeout,
+        check_hostname=check_hostname)
     kwargs = {'domain': Domain, 'filename': location}
     responses = env.perform_async_action('getfile', **kwargs)
 
@@ -80,8 +93,8 @@ save the file to"""
 @logged('mast.datapower.deployment')
 @cli.command('del_file', category="file management")
 def delete_file(appliances=[], credentials=[], timeout=120,
-    Domain="", filename="", backup=False, out_dir="tmp",
-    no_check_hostname=False, web=False):
+                Domain="", filename="", backup=False, out_dir="tmp",
+                no_check_hostname=False, web=False):
     """Deletes a file from the specified appliances
 
 Parameters:
@@ -93,7 +106,11 @@ like to delete
 * out-dir - (NOT NEEDED IN THE WEB GUI)The directory you would like to
 save the file to"""
     check_hostname = not no_check_hostname
-    env = datapower.Environment(appliances, credentials, timeout, check_hostname=check_hostname)
+    env = datapower.Environment(
+        appliances,
+        credentials,
+        timeout,
+        check_hostname=check_hostname)
     if backup:
         resp = {}
         for appliance in env.appliances:
@@ -106,7 +123,9 @@ save the file to"""
     else:
         resp = env.perform_action("del_file", filename=filename, domain=Domain)
     if web:
-        return util.render_boolean_results_table(resp), util.render_history(env)
+        return (
+            util.render_boolean_results_table(resp),
+            util.render_history(env))
     for host, response in resp.items():
         print host
         print "=" * len(host)
@@ -138,7 +157,11 @@ Parameters:
 * recursive - Whether to recurse through sub-directories
 * backup_files - Whether to backup files before deleting them"""
     check_hostname = not no_check_hostname
-    env = datapower.Environment(appliances, credentials, timeout, check_hostname=check_hostname)
+    env = datapower.Environment(
+        appliances,
+        credentials,
+        timeout,
+        check_hostname=check_hostname)
 
     t = Timestamp()
     dirs = []
@@ -194,7 +217,7 @@ def _clean_dir(appliance, _dir, domain, recursive, backup, timestamp, out_dir):
     # if not recursive don't include_directories
     files = appliance.ls(_dir, domain=domain, include_directories=recursive)
     for file in files:
-        if "diag-log" in file and not "." in file:
+        if "diag-log" in file and "." not in file:
             continue
         if ':/' in file:
             _clean_dir(
@@ -243,26 +266,26 @@ def _clean_error_reports(appliance, domain, backup, timestamp, out_dir):
 @logged('mast.datapower.deployment')
 @cli.command('predeploy', category='deployment')
 def predeploy(
-    appliances=[],
-    credentials=[],
-    timeout=120,
-    out_dir="tmp",
-    Domain="",
-    comment="",
-    CryptoCertificate="",
-    secure_backup_destination="local:/raid0",
-    backup_default=True,
-    backup_all=True,
-    do_secure_backup=False,
-    do_normal_backup=True,
-    set_checkpoints=True,
-    include_iscsi=False,
-    include_raid=False,
-    remove_secure_backup=True,
-    web=False,
-    default_checkpoint=True,
-    remove_oldest_checkpoint=True,
-    no_check_hostname=False):
+        appliances=[],
+        credentials=[],
+        timeout=120,
+        out_dir="tmp",
+        Domain="",
+        comment="",
+        CryptoCertificate="",
+        secure_backup_destination="local:/raid0",
+        backup_default=True,
+        backup_all=True,
+        do_secure_backup=False,
+        do_normal_backup=True,
+        set_checkpoints=True,
+        include_iscsi=False,
+        include_raid=False,
+        remove_secure_backup=True,
+        web=False,
+        default_checkpoint=True,
+        remove_oldest_checkpoint=True,
+        no_check_hostname=False):
     """Perform routine pre-deployment actions. Everything is optional, but if
    you wish to perform an action, you must provide the necessary arguments.
 
@@ -324,18 +347,15 @@ def predeploy(
         * remove_oldest_checkpoint - Whether to remove the oldest
         checkpoint from the domain IF AND ONLY IF the maximum number
         of checkpoints has been reached."""
-    if web:
-        from mast.datapower.backups import set_checkpoint, get_normal_backup, get_secure_backup
-        import mast.datapower.system as system
-    else:
-        #lint:disable
-        from mast.datapower.backups import set_checkpoint
-        from mast.datapower.backups import get_normal_backup, get_secure_backup
-        import mast.datapower.system as system
-        #lint:enable
+    from mast.datapower.backups import set_checkpoint
+    from mast.datapower.backups import get_normal_backup, get_secure_backup
 
     check_hostname = not no_check_hostname
-    env = datapower.Environment(appliances, credentials, timeout, check_hostname=check_hostname)
+    env = datapower.Environment(
+        appliances,
+        credentials,
+        timeout,
+        check_hostname=check_hostname)
 
     if web:
         output = ""
@@ -356,7 +376,7 @@ def predeploy(
             logger.info("Starting Secure Backup for {}".format(
                 appliance.hostname))
 
-            resp, hist = get_secure_backup(
+            _out = get_secure_backup(
                 appliances=appliance.hostname,
                 credentials=appliance.credentials,
                 timeout=timeout,
@@ -372,8 +392,8 @@ def predeploy(
                 web=web)
 
             if web:
-                output += resp
-                history += hist
+                output += _out[0]
+                history += _out[1]
 
             logger.info("Finished Secure Backup for {}".format(
                 appliance.hostname))
@@ -390,7 +410,7 @@ def predeploy(
             if backup_all:
                 domains.append("all-domains")
 
-            resp, hist = get_normal_backup(
+            _out = get_normal_backup(
                 appliance.hostname,
                 credentials,
                 timeout,
@@ -405,8 +425,8 @@ def predeploy(
                     str(Timestamp())))
 
             if web:
-                output += resp
-                history += hist
+                output += _out[0]
+                history += _out[1]
 
         # Checkpoints
         if set_checkpoints:
@@ -418,7 +438,7 @@ def predeploy(
             if default_checkpoint:
                 domains.append("default")
 
-            resp, hist = set_checkpoint(
+            _out = set_checkpoint(
                 appliance.hostname,
                 credentials,
                 timeout,
@@ -433,8 +453,8 @@ def predeploy(
                     str(Timestamp())))
 
             if web:
-                output += resp
-                history += hist
+                output += _out[0]
+                history += _out[1]
 
     if web:
         return output, history
@@ -443,25 +463,25 @@ def predeploy(
 @logged('mast.datapower.deployment')
 @cli.command('deploy', category='deployment')
 def deploy(
-    appliances=[],
-    credentials=[],
-    Domain="",
-    file_in=None,
-    deployment_policy="",
-    dry_run=False,
-    overwrite_files=True,
-    overwrite_objects=True,
-    rewrite_local_ip=True,
-    object_audit=True,
-    out_dir='tmp',
-    format='ZIP',
-    predeploy_command=None,
-    postdeploy_command=None,
-    quiesce_domain=True,
-    quiesce_appliance=False,
-    quiesce_timeout=120,
-    timeout=180,
-    no_check_hostname=False, web=False):
+        appliances=[],
+        credentials=[],
+        Domain="",
+        file_in=None,
+        deployment_policy="",
+        dry_run=False,
+        overwrite_files=True,
+        overwrite_objects=True,
+        rewrite_local_ip=True,
+        object_audit=True,
+        out_dir='tmp',
+        format='ZIP',
+        predeploy_command=None,
+        postdeploy_command=None,
+        quiesce_domain=True,
+        quiesce_appliance=False,
+        quiesce_timeout=120,
+        timeout=180,
+        no_check_hostname=False, web=False):
 
     """Perform a deployment/migration of a service/object to an IBM DataPower
    appliance. This script will try to perform the deployment/migration in a
@@ -580,18 +600,8 @@ def deploy(
       * (NOT NEEDED IN THE WEB GUI) This is where you would like
       all of the output files to be placed.
 """
-
-    if web:
-        from mast.datapower.backups import set_checkpoint, get_normal_backup, get_secure_backup
-        import mast.datapower.system as system
-        from mast.datapower.developer import _import
-    else:
-        #lint:disable
-        from mast.datapower.backups import set_checkpoint
-        from mast.datapower.backups import get_normal_backup, get_secure_backup
-        import mast.datapower.system as system
-        from mast.datapower.developer import _import
-        #lint:enable
+    import mast.datapower.system as system
+    from mast.datapower.developer import _import
 
     if web:
         output = ""
@@ -609,7 +619,11 @@ def deploy(
                 predeploy_command, str(Timestamp())))
 
     check_hostname = not no_check_hostname
-    env = datapower.Environment(appliances, credentials, timeout, check_hostname=check_hostname)
+    env = datapower.Environment(
+        appliances,
+        credentials,
+        timeout,
+        check_hostname=check_hostname)
 
     for appliance in env.appliances:
         appliance.log_info("Deployment started on {}".format(
@@ -621,7 +635,7 @@ def deploy(
                 "Quiescing domain {} before deployment at {}".format(
                     Domain, str(Timestamp())))
 
-            resp, hist = system.quiesce_domain(
+            _out = system.quiesce_domain(
                 appliance.hostname,
                 credentials,
                 timeout,
@@ -637,8 +651,8 @@ def deploy(
             sleep(quiesce_timeout)
 
             if web:
-                output += resp
-                history += hist
+                output += _out[0]
+                history += _out[1]
 
         # Quiesce Appliance
         if quiesce_appliance:
@@ -646,7 +660,7 @@ def deploy(
                 "Quiescing appliances before deployment at {}".format(
                     str(Timestamp())))
 
-            resp, hist = system.quiesce_appliance(
+            _out = system.quiesce_appliance(
                 appliance.hostname,
                 credentials,
                 timeout,
@@ -661,8 +675,8 @@ def deploy(
             sleep(quiesce_timeout)
 
             if web:
-                output += resp
-                history += hist
+                output += _out[0]
+                history += _out[1]
 
         appliance.log_info("Attempting to import configuration at '{}'".format(
             str(Timestamp())))
@@ -671,15 +685,15 @@ def deploy(
             out_dir, '{}-deployment_results.txt'.format(appliance.hostname))
 
         # import configuration
-        resp, hist = _import(
+        _out = _import(
             appliance.hostname, credentials, timeout, Domain, file_in,
             deployment_policy, dry_run, overwrite_files, overwrite_objects,
-            rewrite_local_ip, format, file_out, no_check_hostname=no_check_hostname,
-            web=web)
+            rewrite_local_ip, format, file_out,
+            no_check_hostname=no_check_hostname, web=web)
 
         if web:
-            output += resp
-            history += hist
+            output += _out[0]
+            history += _out[1]
 
         appliance.log_info("Finished importing configuration at {}".format(
             str(Timestamp())))
@@ -688,7 +702,7 @@ def deploy(
         if quiesce_domain:
             appliance.log_info("Attempting to unquiesce domain")
 
-            resp, hist = system.unquiesce_domain(
+            _out = system.unquiesce_domain(
                 appliance.hostname,
                 credentials,
                 timeout,
@@ -699,8 +713,8 @@ def deploy(
             appliance.log_info("Finished unquiescing domain")
 
             if web:
-                output += resp
-                history += hist
+                output += _out[0]
+                history += _out[1]
 
         # unquiesce appliance
         if quiesce_appliance:
@@ -708,7 +722,7 @@ def deploy(
                 "Quiescing appliances before deployment at {}".format(
                     str(Timestamp())))
 
-            resp, hist = system.unquiesce_appliance(
+            _out = system.unquiesce_appliance(
                 appliance.hostname,
                 credentials,
                 timeout,
@@ -720,24 +734,27 @@ def deploy(
                     str(Timestamp())))
 
             if web:
-                output += resp
-                history += hist
+                output += _out[0]
+                history += _out[1]
 
         if object_audit:
             appliance.log_info(
                 "Post-Deployment Object audit started at {}".format(
-                str(Timestamp())))
+                    str(Timestamp())))
 
-            resp, hist = system.objects_audit(appliance.hostname, credentials,
-                timeout, out_dir, no_check_hostname=no_check_hostname, web=web)
+            _out = system.objects_audit(
+                appliance.hostname, credentials,
+                timeout, out_dir,
+                no_check_hostname=no_check_hostname,
+                web=web)
 
             appliance.log_info(
                 "Post-Deployment Object audit finished at {}".format(
-                str(Timestamp())))
+                    str(Timestamp())))
 
             if web:
-                output += resp
-                history += hist
+                output += _out[0]
+                history += _out[1]
 
     if postdeploy_command:
         logger.info(
@@ -767,10 +784,7 @@ def postdeploy(appliances=[], credentials=[], timeout=120,
 
    * save_config - Whether to save the configuration in the specified
    domain."""
-    if web:
-        import mast.datapower.system as system
-    else:
-        import mast.datapower.system as system
+    import mast.datapower.system as system
 
     check_hostname = not no_check_hostname
     env = datapower.Environment(
@@ -788,7 +802,7 @@ def postdeploy(appliances=[], credentials=[], timeout=120,
             appliance.log_info(
                 "Attempting to save configuration after deployment")
 
-            resp, hist = system.save_config(
+            _out = system.save_config(
                 [appliance.hostname],
                 [credentials],
                 timeout,
@@ -800,8 +814,8 @@ def postdeploy(appliances=[], credentials=[], timeout=120,
                 "Finished saving configuration after deployment")
 
             if web:
-                output += resp
-                history += hist
+                output += _out[0]
+                history += _out[1]
     if web:
         return output, history
 
@@ -811,10 +825,6 @@ def get_data_file(f):
     path = os.path.join(_root, "data", f)
     with open(path, "rb") as fin:
         return fin.read()
-
-from mast.plugins.web import Plugin
-import mast.plugin_utils.plugin_functions as pf
-from functools import partial, update_wrapper
 
 
 class WebPlugin(Plugin):

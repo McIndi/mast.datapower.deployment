@@ -481,7 +481,8 @@ def deploy(
         quiesce_appliance=False,
         quiesce_timeout=120,
         timeout=180,
-        no_check_hostname=False, web=False):
+        no_check_hostname=False,
+        web=False):
 
     """Perform a deployment/migration of a service/object to an IBM DataPower
    appliance. This script will try to perform the deployment/migration in a
@@ -773,9 +774,13 @@ def deploy(
 
 @logged('mast.datapower.deployment')
 @cli.command('postdeploy', category='deployment')
-def postdeploy(appliances=[], credentials=[], timeout=120,
-               Domain="", save_config=True,
-               no_check_hostname=False, web=True):
+def postdeploy(appliances=[],
+               credentials=[],
+               timeout=120,
+               Domain="",
+               save_config=True,
+               no_check_hostname=False,
+               web=False):
     """This is a simple script which will allow you to unquiesce
    your domain or appliances after you quiesce them for a deployment.
    Also this will allow you to save the config.

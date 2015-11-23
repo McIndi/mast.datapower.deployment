@@ -7,6 +7,7 @@ from time import sleep
 from mast.datapower import datapower
 from mast.plugins.web import Plugin
 from mast.timestamp import Timestamp
+from pkg_resources import resource_string
 from mast.logging import make_logger, logged
 from functools import partial, update_wrapper
 import mast.plugin_utils.plugin_utils as util
@@ -825,10 +826,7 @@ def postdeploy(appliances=[],
 
 
 def get_data_file(f):
-    _root = os.path.dirname(__file__)
-    path = os.path.join(_root, "data", f)
-    with open(path, "rb") as fin:
-        return fin.read()
+    return resource_string(__name__, 'docroot/{}'.format(f))
 
 
 class WebPlugin(Plugin):

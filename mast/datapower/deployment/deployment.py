@@ -12,9 +12,6 @@ from functools import partial, update_wrapper
 import mast.plugin_utils.plugin_utils as util
 import mast.plugin_utils.plugin_functions as pf
 
-
-logger = make_logger('mast.datapower.deployment')
-
 cli = commandr.Commandr()
 
 
@@ -350,6 +347,7 @@ def predeploy(
     from mast.datapower.backups import set_checkpoint
     from mast.datapower.backups import get_normal_backup, get_secure_backup
 
+    logger = make_logger('mast.datapower.deployment')
     check_hostname = not no_check_hostname
     env = datapower.Environment(
         appliances,
@@ -604,6 +602,7 @@ def deploy(
     import mast.datapower.system as system
     from mast.datapower.developer import _import
 
+    logger = make_logger('mast.datapower.deployment')
     if web:
         output = ""
         history = ""

@@ -809,7 +809,7 @@ def postdeploy(appliances=[],
 
             _out = system.save_config(
                 [appliance.hostname],
-                [credentials],
+                [appliance.credentials],
                 timeout,
                 Domain,
                 no_check_hostname=no_check_hostname,

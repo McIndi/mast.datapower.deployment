@@ -89,7 +89,7 @@ save the file to"""
 
 
 @logged('mast.datapower.deployment')
-@cli.command('del_file', category="file management")
+@cli.command('del-file', category="file management")
 def delete_file(appliances=[], credentials=[], timeout=120,
                 Domain="", filename="", backup=False, out_dir="tmp",
                 no_check_hostname=False, web=False):

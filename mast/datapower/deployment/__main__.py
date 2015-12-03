@@ -4,5 +4,13 @@ from deployment import cli
 import sys
 sys.argv[0] = "mast-deployment"
 
-cli.Run()
-
+try:
+    cli.Run()
+except AttributeError, e:
+    if "'NoneType' object has no attribute 'app'" in e:
+        raise NotImplementedError(
+            "HTML formatted output is not supported on the CLI")
+except ImportError, e:
+    if "No module named backups" in e:
+        raise NotImplementedError(
+            "HTML formatted output is not supported on the CLI")

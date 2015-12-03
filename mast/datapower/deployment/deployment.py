@@ -778,6 +778,8 @@ def postdeploy(appliances=[],
                credentials=[],
                timeout=120,
                Domain="",
+               unquiesce_domain=True,
+               unquiesce_appliance=False,
                save_config=True,
                no_check_hostname=False,
                web=False):
@@ -802,6 +804,36 @@ def postdeploy(appliances=[],
         output = ""
         history = ""
     for appliance in env.appliances:
+        if unquiesce_appliance:
+            appliance.log_info("Attempting to unquiesce appliance")
+            _out = system.unquiesce_appliance(
+                [appliance.hostname],
+                [appliance.credentials],
+                timeout=timeout,
+                no_check_hostname=no_check_hostname,
+                web=web)
+            appliance.log_info(
+                "Finished Unquiescing appliance")
+
+            if web:
+                output += _out[0]
+                history += _out[1]
+
+        if unquiesce_domain:
+            appliance.log_info("Attempting to unquiesce domain")
+            _out = system.unquiesce_domain(
+                [appliance.hostname],
+                [appliance.credentials],
+                timeout=timeout,
+                Domain=Domain,
+                no_check_hostname=no_check_hostname,
+                web=web)
+            appliance.log_info(
+                "Finished Unquiescing domain")
+
+            if web:
+                output += _out[0]
+                history += _out[1]
 
         if save_config:
             appliance.log_info(

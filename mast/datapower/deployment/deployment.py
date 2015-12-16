@@ -18,18 +18,46 @@ cli = commandr.Commandr()
 
 @logged('mast.datapower.deployment')
 @cli.command('set-file', category='file management')
-def set_file(appliances=[], credentials=[], timeout=120,
-             file_in=None, destination=None, Domain='default',
-             overwrite=True, no_check_hostname=False, web=False):
+def set_file(appliances=[],
+             credentials=[],
+             timeout=120,
+             no_check_hostname=False,
+             file_in=None,
+             destination=None,
+             Domain='default',
+             overwrite=True,
+             web=False):
     """Uploads a file to the specified appliances
 
 Parameters:
 
-file-in - The path and filename of the file to upload
-* destination - Should be the path and filename of the file
+* `-a, --appliances`: The hostname(s), ip addresse(s), environment name(s)
+or alias(es) of the appliances you would like to affect. For details
+on configuring environments please see the comments in
+`environments.conf` located in `$MAST_HOME/etc/default`. For details
+on configuring aliases please see the comments in `hosts.conf` located
+in `$MAST_HOME/etc/default`.
+* `-c, --credentials`: The credentials to use for authenticating to the
+appliances. Should be either one set to use for all appliances
+or one set for each appliance. Credentials should be in the form
+`username:password` and should be provided in a space-seperated list
+if multiple are provided. If you would prefer to not use plain-text
+passwords, you can use the output of
+`$ mast-system xor <username:password>`.
+* `-t, --timeout`: The timeout in seconds to wait for a response from
+an appliance for any single request. __NOTE__ Program execution may
+halt if a timeout is reached.
+* `-n, --no-check-hostname`: If specified SSL verification will be turned
+off when sending commands to the appliances.
+* `-f, --file-in`: The path and filename of the file to upload
+* `-d, --destination`: Should be the path and filename of the file
 once uploaded to the DataPower **NOTE: file_out should contain
 the filename ie. local:/test.txt**
-* Domain - The domain to which to upload the file"""
+* `-D, --Domain`: The domain to which to upload the file,
+* `-N, --no-overwrite`: If specified this program will exit with an
+error rather than overwrite a file
+* `-w, --web`: __For Internel Use Only, will be removed in future versions.
+DO NOT USE.__"""
     check_hostname = not no_check_hostname
     env = datapower.Environment(
         appliances,
@@ -50,19 +78,43 @@ the filename ie. local:/test.txt**
 
 @logged('mast.datapower.deployment')
 @cli.command('get-file', category='file management')
-def get_file(appliances=[], credentials=[], timeout=120,
-             location=None, Domain='default', out_dir='tmp',
-             no_check_hostname=False, web=False):
+def get_file(appliances=[],
+             credentials=[],
+             timeout=120,
+             no_check_hostname=False,
+             location=None,
+             Domain='default',
+             out_dir='tmp',
+             web=False):
     """retrieves a file from the specified appliances
 
 Parameters:
 
-* location - The location of the file (on DataPower) you would
+* `-a, --appliances`: The hostname(s), ip addresse(s), environment name(s)
+or alias(es) of the appliances you would like to affect. For details
+on configuring environments please see the comments in
+`environments.conf` located in `$MAST_HOME/etc/default`. For details
+on configuring aliases please see the comments in `hosts.conf` located
+in `$MAST_HOME/etc/default`.
+* `-c, --credentials`: The credentials to use for authenticating to the
+appliances. Should be either one set to use for all appliances
+or one set for each appliance. Credentials should be in the form
+`username:password` and should be provided in a space-seperated list
+if multiple are provided. If you would prefer to not use plain-text
+passwords, you can use the output of
+`$ mast-system xor <username:password>`.
+* `-t, --timeout`: The timeout in seconds to wait for a response from
+an appliance for any single request. __NOTE__ Program execution may
+halt if a timeout is reached.
+* `-n, --no-check-hostname`: If specified SSL verification will be turned
+off when sending commands to the appliances.
+* `-l, --location`: The location of the file (on DataPower) you would
 like to get
-* Domain - The domain from which to get the file
-* out-dir - (NOT NEEDED IN THE WEB GUI)The directory you would like to
-save the file to"""
-
+* `-D, --Domain`: The domain from which to get the file
+* `-o, --out-dir`: (NOT NEEDED IN THE WEB GUI)The directory you would like to
+save the file to
+* `-w, --web`: __For Internel Use Only, will be removed in future versions.
+DO NOT USE.__"""
     t = Timestamp()
     check_hostname = not no_check_hostname
     env = datapower.Environment(
@@ -90,19 +142,45 @@ save the file to"""
 
 @logged('mast.datapower.deployment')
 @cli.command('del-file', category="file management")
-def delete_file(appliances=[], credentials=[], timeout=120,
-                Domain="", filename="", backup=False, out_dir="tmp",
-                no_check_hostname=False, web=False):
+def delete_file(appliances=[],
+                credentials=[],
+                timeout=120,
+                no_check_hostname=False,
+                Domain="",
+                filename="",
+                backup=False,
+                out_dir="tmp",
+                web=False):
     """Deletes a file from the specified appliances
 
 Parameters:
 
-* filename - The name of the file (on DataPower) you would
+* `-a, --appliances`: The hostname(s), ip addresse(s), environment name(s)
+or alias(es) of the appliances you would like to affect. For details
+on configuring environments please see the comments in
+`environments.conf` located in `$MAST_HOME/etc/default`. For details
+on configuring aliases please see the comments in `hosts.conf` located
+in `$MAST_HOME/etc/default`.
+* `-c, --credentials`: The credentials to use for authenticating to the
+appliances. Should be either one set to use for all appliances
+or one set for each appliance. Credentials should be in the form
+`username:password` and should be provided in a space-seperated list
+if multiple are provided. If you would prefer to not use plain-text
+passwords, you can use the output of
+`$ mast-system xor <username:password>`.
+* `-t, --timeout`: The timeout in seconds to wait for a response from
+an appliance for any single request. __NOTE__ Program execution may
+halt if a timeout is reached.
+* `-n, --no-check-hostname`: If specified SSL verification will be turned
+off when sending commands to the appliances.
+* `-f, --filename`: The name of the file (on DataPower) you would
 like to delete
-* Domain - The domain from which to delete the file
-* backup - Whether to backup the file before deleting
-* out-dir - (NOT NEEDED IN THE WEB GUI)The directory you would like to
-save the file to"""
+* `-D, --Domain`: The domain from which to delete the file
+* `-b, --backup`: Whether to backup the file before deleting
+* `-o, --out-dir`: (NOT NEEDED IN THE WEB GUI)The directory you would like to
+save the file to
+* `-w, --web`: __For Internel Use Only, will be removed in future versions.
+DO NOT USE.__"""
     check_hostname = not no_check_hostname
     env = datapower.Environment(
         appliances,
@@ -136,24 +214,53 @@ save the file to"""
 
 @logged('mast.datapower.deployment')
 @cli.command('clean-up', category='maintenance')
-def clean_up(appliances=[], credentials=[],
-             Domain='default', checkpoints=False,
-             export=False, error_reports=False,
-             recursive=False, logtemp=False,
-             logstore=False, backup_files=True,
-             timeout=120, out_dir='tmp', no_check_hostname=False, web=False):
+def clean_up(appliances=[],
+             credentials=[],
+             timeout=120,
+             no_check_hostname=False,
+             Domain='default',
+             checkpoints=False,
+             export=False,
+             error_reports=False,
+             recursive=False,
+             logtemp=False,
+             logstore=False,
+             backup_files=True,
+             out_dir='tmp',
+             web=False):
     """This will clean up the specified appliances filesystem.
 
 Parameters:
 
-* Domain - The domain who's filesystem you would like to clean up
-* checkpoints - Whether to cleanup the checkpoints: directory
-* export - Whether to clean up the export directory
-* logtemp - Whether to clean up the logtemp: directory
-* logstore - Whether to clean up the logstore directory
-* error-reports - Whether to clean up the error reports
-* recursive - Whether to recurse through sub-directories
-* backup_files - Whether to backup files before deleting them"""
+* `-a, --appliances`: The hostname(s), ip addresse(s), environment name(s)
+or alias(es) of the appliances you would like to affect. For details
+on configuring environments please see the comments in
+`environments.conf` located in `$MAST_HOME/etc/default`. For details
+on configuring aliases please see the comments in `hosts.conf` located
+in `$MAST_HOME/etc/default`.
+* `-c, --credentials`: The credentials to use for authenticating to the
+appliances. Should be either one set to use for all appliances
+or one set for each appliance. Credentials should be in the form
+`username:password` and should be provided in a space-seperated list
+if multiple are provided. If you would prefer to not use plain-text
+passwords, you can use the output of
+`$ mast-system xor <username:password>`.
+* `-t, --timeout`: The timeout in seconds to wait for a response from
+an appliance for any single request. __NOTE__ Program execution may
+halt if a timeout is reached.
+* `-n, --no-check-hostname`: If specified SSL verification will be turned
+off when sending commands to the appliances.
+* `-D, --Domain`: The domain who's filesystem you would like to clean up
+* `-C, --checkpoints`: Whether to cleanup the checkpoints: directory
+* `-e, --export`: Whether to clean up the export directory
+* `-l, --logtemp`: Whether to clean up the logtemp: directory
+* `-L, --logstore`: Whether to clean up the logstore directory
+* `-E, --error-reports`: Whether to clean up the error reports
+* `-r, --recursive`: Whether to recurse through sub-directories
+* `-N, --no-backup_files`: Whether to backup files before deleting them
+* `-o, --out-dir`: The directory to store backup files
+* `-w, --web`: __For Internel Use Only, will be removed in future versions.
+DO NOT USE.__"""
     check_hostname = not no_check_hostname
     env = datapower.Environment(
         appliances,
@@ -292,7 +399,6 @@ def predeploy(
    1. Secure Backup
      * The following params must be specified:
         * do_secure_backup - Whether to retrieve a secure backup
-
         * out_dir (not needed in web GUI) - The directory (local) where
         the secure backup will be stored
 

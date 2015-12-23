@@ -228,11 +228,12 @@ def clean_up(appliances=[],
              backup_files=True,
              out_dir='tmp',
              web=False):
-    """This will clean up the specified appliances filesystem.
+    """This will clean up the specified appliances filesystem optionally
+(defaults to True) taking copies of the files as backups.
 
 Parameters:
 
-* `-a, --appliances`: The hostname(s), ip addresse(s), environment name(s)
+* `-a, --appliances` - The hostname(s), ip addresse(s), environment name(s)
 or alias(es) of the appliances you would like to affect. For details
 on configuring environments please see the comments in
 `environments.conf` located in `$MAST_HOME/etc/default`. For details
@@ -251,14 +252,19 @@ halt if a timeout is reached.
 * `-n, --no-check-hostname`: If specified SSL verification will be turned
 off when sending commands to the appliances.
 * `-D, --Domain`: The domain who's filesystem you would like to clean up
-* `-C, --checkpoints`: Whether to cleanup the checkpoints: directory
-* `-e, --export`: Whether to clean up the export directory
-* `-E, --error-reports`: Whether to clean up the error reports
-* `-r, --recursive`: Whether to recurse through sub-directories
-* `-l, --logtemp`: Whether to clean up the logtemp: directory
-* `-L, --logstore`: Whether to clean up the logstore directory
-* `-N, --no-backup_files`: Whether to backup files before deleting them
-* `-o, --out-dir`: The directory to store backup files
+* `-C, --checkpoints`: If specified, all checkpoints will be removed
+from the domain
+* `-e, --export`: If specified all exports will be removed from the domain
+* `-l, --logtemp`: If specified, all files in `logtemp:` will be removed
+from the domain
+* `-L, --logstore`: If specified, all files in `logstore:` will be
+removed
+* `-E, --error-reports`: If specified, all error reports will be removed
+from the appliance(s)
+* `-r, --recursive`: If specified, directories will be cleaned recursively
+* `--no-backup-files`: If specified, files will not be backed up before
+deleting
+* `-o, --out-dir`: The directory to save backed up files
 * `-w, --web`: __For Internel Use Only, will be removed in future versions.
 DO NOT USE.__"""
     check_hostname = not no_check_hostname

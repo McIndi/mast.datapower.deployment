@@ -723,12 +723,12 @@ DO NOT USE.__"""
                     Domain, str(Timestamp())))
 
             _out = system.quiesce_domain(
-                appliance.hostname,
-                credentials,
-                timeout,
-                Domain,
-                quiesce_timeout,
+                appliances=[appliance.hostname],
+                credentials=credentials,
+                timeout=timeout,
                 no_check_hostname=no_check_hostname,
+                Domain=Domain,
+                quiesce_timeout=quiesce_timeout,
                 web=web)
 
             logger.info(
@@ -748,11 +748,11 @@ DO NOT USE.__"""
                     str(Timestamp())))
 
             _out = system.quiesce_appliance(
-                appliance.hostname,
-                credentials,
-                timeout,
-                quiesce_timeout,
+                appliances=appliance.hostname,
+                credentials=credentials,
+                timeout=timeout,
                 no_check_hostname=no_check_hostname,
+                quiesce_timeout=quiesce_timeout,
                 web=web)
 
             logger.info(
@@ -773,10 +773,21 @@ DO NOT USE.__"""
 
         # import configuration
         _out = _import(
-            appliance.hostname, credentials, timeout, Domain, file_in,
-            deployment_policy, dry_run, overwrite_files, overwrite_objects,
-            rewrite_local_ip, format, file_out,
-            no_check_hostname=no_check_hostname, web=web)
+            appliances=[appliance.hostname],
+            credentials=credentials,
+            timeout=timeout,
+            no_check_hostname=no_check_hostname,
+            Domain=Domain,
+            file_in=file_in,
+            deployment_policy=deployment_policy,
+            dry_run=dry_run,
+            overwrite_files=overwrite_files,
+            overwrite_objects=overwrite_objects,
+            rewrite_local_ip=rewrite_local_ip,
+            source_type=format,
+            out_dir=out_dir,
+            web=web)
+
 
         if web:
             output += _out[0]
@@ -790,11 +801,11 @@ DO NOT USE.__"""
             appliance.log_info("Attempting to unquiesce domain")
 
             _out = system.unquiesce_domain(
-                appliance.hostname,
-                credentials,
-                timeout,
-                Domain,
+                appliances=[appliance.hostname],
+                credentials=credentials,
+                timeout=timeout,
                 no_check_hostname=no_check_hostname,
+                Domain=Domain,
                 web=web)
 
             appliance.log_info("Finished unquiescing domain")
@@ -810,9 +821,9 @@ DO NOT USE.__"""
                     str(Timestamp())))
 
             _out = system.unquiesce_appliance(
-                appliance.hostname,
-                credentials,
-                timeout,
+                appliances=[appliance.hostname],
+                credentials=credentials,
+                timeout=timeout,
                 no_check_hostname=no_check_hostname,
                 web=web)
 
@@ -830,9 +841,11 @@ DO NOT USE.__"""
                     str(Timestamp())))
 
             _out = system.objects_audit(
-                appliance.hostname, credentials,
-                timeout, out_dir,
+                appliances=[appliance.hostname],
+                credentials=credentials,
+                timeout=timeout,
                 no_check_hostname=no_check_hostname,
+                out_dir=out_dir,
                 web=web)
 
             appliance.log_info(
@@ -917,9 +930,10 @@ DO NOT USE.__"""
     for appliance in env.appliances:
         if unquiesce_appliance:
             appliance.log_info("Attempting to unquiesce appliance")
+
             _out = system.unquiesce_appliance(
-                [appliance.hostname],
-                [appliance.credentials],
+                appliances=[appliance.hostname],
+                credentials=[appliance.credentials],
                 timeout=timeout,
                 no_check_hostname=no_check_hostname,
                 web=web)
@@ -932,12 +946,13 @@ DO NOT USE.__"""
 
         if unquiesce_domain:
             appliance.log_info("Attempting to unquiesce domain")
+
             _out = system.unquiesce_domain(
-                [appliance.hostname],
-                [appliance.credentials],
+                appliances=[appliance.hostname],
+                credentials=[appliance.credentials],
                 timeout=timeout,
-                Domain=Domain,
                 no_check_hostname=no_check_hostname,
+                Domain=Domain,
                 web=web)
             appliance.log_info(
                 "Finished Unquiescing domain")
@@ -948,9 +963,10 @@ DO NOT USE.__"""
 
         if unquiesce_appliance:
             appliance.log_info("Attempting to unquiesce appliance")
+
             _out = system.unquiesce_appliance(
-                [appliance.hostname],
-                [appliance.credentials],
+                appliances=[appliance.hostname],
+                credentials=[appliance.credentials],
                 timeout=timeout,
                 no_check_hostname=no_check_hostname,
                 web=web)
@@ -966,11 +982,11 @@ DO NOT USE.__"""
                 "Attempting to save configuration after deployment")
 
             _out = system.save_config(
-                [appliance.hostname],
-                [appliance.credentials],
-                timeout,
-                Domain,
+                appliances=[appliance.hostname],
+                credentials=[appliance.credentials],
+                timeout=timeout,
                 no_check_hostname=no_check_hostname,
+                Domain=Domain,
                 web=web)
 
             appliance.log_info(

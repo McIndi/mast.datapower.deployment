@@ -40,11 +40,11 @@ in `$MAST_HOME/etc/default`.
 * `-c, --credentials`: The credentials to use for authenticating to the
 appliances. Should be either one set to use for all appliances
 or one set for each appliance. Credentials should be in the form
-`username:password` and should be provided in a space-separated list
+`username:password` and should be provided in a space-separated list,
 if multiple are provided. When referencing multiple appliances with
-multiple credentials there must be a one to one correspondence of 
+multiple credentials, there must be a one-to-one correspondence of 
 credentials to appliances:
-[appliance1 [appliance2...]] [credential1 [credential2...]] 
+`[appliance1 [appliance2...]] [credential1 [credential2...]]` 
 If you would prefer to not use plain-text passwords, 
 you can use the output of `$ mast-system xor <username:password>`.
 * `-t, --timeout`: The timeout in seconds to wait for a response from
@@ -102,11 +102,11 @@ in `$MAST_HOME/etc/default`.
 * `-c, --credentials`: The credentials to use for authenticating to the
 appliances. Should be either one set to use for all appliances
 or one set for each appliance. Credentials should be in the form
-`username:password` and should be provided in a space-separated list
+`username:password` and should be provided in a space-separated list,
 if multiple are provided. When referencing multiple appliances with
-multiple credentials there must be a one to one correspondence of 
+multiple credentials, there must be a one-to-one correspondence of 
 credentials to appliances:
-[appliance1 [appliance2...]] [credential1 [credential2...]] 
+`[appliance1 [appliance2...]] [credential1 [credential2...]]` 
 If you would prefer to not use plain-text passwords, 
 you can use the output of `$ mast-system xor <username:password>`.
 * `-t, --timeout`: The timeout in seconds to wait for a response from
@@ -170,11 +170,11 @@ in `$MAST_HOME/etc/default`.
 * `-c, --credentials`: The credentials to use for authenticating to the
 appliances. Should be either one set to use for all appliances
 or one set for each appliance. Credentials should be in the form
-`username:password` and should be provided in a space-separated list
+`username:password` and should be provided in a space-separated list,
 if multiple are provided. When referencing multiple appliances with
-multiple credentials there must be a one to one correspondence of 
+multiple credentials, there must be a one-to-one correspondence of 
 credentials to appliances:
-[appliance1 [appliance2...]] [credential1 [credential2...]] 
+`[appliance1 [appliance2...]] [credential1 [credential2...]]` 
 If you would prefer to not use plain-text passwords, 
 you can use the output of `$ mast-system xor <username:password>`.
 * `-t, --timeout`: The timeout in seconds to wait for a response from
@@ -251,13 +251,13 @@ in `$MAST_HOME/etc/default`.
 * `-c, --credentials`: The credentials to use for authenticating to the
 appliances. Should be either one set to use for all appliances
 or one set for each appliance. Credentials should be in the form
-`username:password` and should be provided in a space-separated list
+`username:password` and should be provided in a space-separated list,
 if multiple are provided. When referencing multiple appliances with
-multiple credentials there must be a one to one correspondence of 
+multiple credentials, there must be a one-to-one correspondence of 
 credentials to appliances:
-[appliance1 [appliance2...]] [credential1 [credential2...]] If you would prefer to not use plain-text
-passwords, you can use the output of
-`$ mast-system xor <username:password>`.
+`[appliance1 [appliance2...]] [credential1 [credential2...]]` 
+If you would prefer to not use plain-text passwords, 
+you can use the output of `$ mast-system xor <username:password>`.
 * `-t, --timeout`: The timeout in seconds to wait for a response from
 an appliance for any single request. __NOTE__ Program execution may
 halt if a timeout is reached.
@@ -423,13 +423,13 @@ in `$MAST_HOME/etc/default`.
 * `-c, --credentials`: The credentials to use for authenticating to the
 appliances. Should be either one set to use for all appliances
 or one set for each appliance. Credentials should be in the form
-`username:password` and should be provided in a space-separated list
+`username:password` and should be provided in a space-separated list,
 if multiple are provided. When referencing multiple appliances with
-multiple credentials there must be a one to one correspondence of 
+multiple credentials, there must be a one-to-one correspondence of 
 credentials to appliances:
-[appliance1 [appliance2...]] [credential1 [credential2...]] If you would prefer to not use plain-text
-passwords, you can use the output of
-`$ mast-system xor <username:password>`.
+`[appliance1 [appliance2...]] [credential1 [credential2...]]` 
+If you would prefer to not use plain-text passwords, 
+you can use the output of `$ mast-system xor <username:password>`.
 * `-t, --timeout`: The timeout in seconds to wait for a response from
 an appliance for any single request. __NOTE__ Program execution may
 halt if a timeout is reached.
@@ -654,13 +654,13 @@ in `$MAST_HOME/etc/default`.
 * `-c, --credentials`: The credentials to use for authenticating to the
 appliances. Should be either one set to use for all appliances
 or one set for each appliance. Credentials should be in the form
-`username:password` and should be provided in a space-separated list
+`username:password` and should be provided in a space-separated list,
 if multiple are provided. When referencing multiple appliances with
-multiple credentials there must be a one to one correspondence of 
+multiple credentials, there must be a one-to-one correspondence of 
 credentials to appliances:
-[appliance1 [appliance2...]] [credential1 [credential2...]] If you would prefer to not use plain-text
-passwords, you can use the output of
-`$ mast-system xor <username:password>`.
+`[appliance1 [appliance2...]] [credential1 [credential2...]]` 
+If you would prefer to not use plain-text passwords, 
+you can use the output of `$ mast-system xor <username:password>`.
 * `-t, --timeout`: The timeout in seconds to wait for a response from
 an appliance for any single request. __NOTE__ Program execution may
 halt if a timeout is reached.
@@ -915,13 +915,13 @@ in `$MAST_HOME/etc/default`.
 * `-c, --credentials`: The credentials to use for authenticating to the
 appliances. Should be either one set to use for all appliances
 or one set for each appliance. Credentials should be in the form
-`username:password` and should be provided in a space-separated list
+`username:password` and should be provided in a space-separated list,
 if multiple are provided. When referencing multiple appliances with
-multiple credentials there must be a one to one correspondence of 
+multiple credentials, there must be a one-to-one correspondence of 
 credentials to appliances:
-[appliance1 [appliance2...]] [credential1 [credential2...]] If you would prefer to not use plain-text
-passwords, you can use the output of
-`$ mast-system xor <username:password>`.
+`[appliance1 [appliance2...]] [credential1 [credential2...]]` 
+If you would prefer to not use plain-text passwords, 
+you can use the output of `$ mast-system xor <username:password>`.
 * `-t, --timeout`: The timeout in seconds to wait for a response from
 an appliance for any single request. __NOTE__ Program execution may
 halt if a timeout is reached.

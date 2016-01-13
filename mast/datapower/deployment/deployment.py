@@ -12,6 +12,7 @@ import sys
 import flask
 import commandr
 from time import sleep
+import subprocess
 from mast.datapower import datapower
 from mast.plugins.web import Plugin
 from mast.timestamp import Timestamp
@@ -22,6 +23,29 @@ import mast.plugin_utils.plugin_utils as util
 import mast.plugin_utils.plugin_functions as pf
 
 cli = commandr.Commandr()
+
+
+def system_call(
+        command,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        shell=False):
+    """
+    # system_call
+
+    helper function to shell out commands. This should be platform
+    agnostic.
+    """
+    stderr = subprocess.STDOUT
+    pipe = subprocess.Popen(
+        command,
+        stdin=stdin,
+        stdout=stdout,
+        stderr=stderr,
+        shell=shell)
+    stdout, stderr = pipe.communicate()
+    return stdout, stderr
 
 
 @logged('mast.datapower.deployment')
@@ -408,6 +432,7 @@ def predeploy(
         out_dir="tmp",
         Domain="",
         comment="",
+        predeploy_command=None,
         CryptoCertificate="",
         secure_backup_destination="local:/raid0",
         backup_default=True,
@@ -455,6 +480,10 @@ script
 in which to set a checkpoint
 * `-C, --comment`: This is shared among other actions. The comment is
 used to build the name of the checkpoint.
+* `-p, --predeploy-command`: This command will be "shelled out"
+to the machine running MAST after performing the backups and checkpoints.
+Use this parameter to pull from version control or similar
+operations.
 * `--CryptoCertificate`: The CryptoCertificate with which to
 encrypt the secure backup
 * `-s, --secure-backup-destination`: The destination (on the DataPower)
@@ -614,6 +643,26 @@ Here is what is possible (will be done in this order):
                 output += _out[0]
                 history += _out[1]
 
+    if predeploy_command:
+        logger.info(
+            "Pre-Deployment command '{}' found. Executing at {}".format(
+                predeploy_command, str(Timestamp())))
+
+        out, err = system_call(command=predeploy_command)
+        out = str(out)
+        err = str(err)
+
+        logger.info(
+            "finished executing Pre-Deployment command '{}' at {}., output: {}".format(
+                predeploy_command, str(Timestamp()), ";".join([out, err])))
+        if web:
+            from mast.plugin_utils.plugin_utils import render_results_table
+            results = {"predeploy command": "{}\n\nout: {}\n\nerr: {}".format(predeploy_command, out, err)}
+            output += render_results_table(results)
+        else:
+            print "Finished running pre-deploy command. output: {}".format(
+                ";".join([out, err]))
+
     if web:
         return output, history
 
@@ -635,8 +684,6 @@ def deploy(
         object_audit=True,
         out_dir='tmp',
         format='ZIP',
-        predeploy_command=None,
-        postdeploy_command=None,
         quiesce_domain=True,
         quiesce_appliance=False,
         quiesce_timeout=120,
@@ -702,14 +749,6 @@ persisted configuration
 by this script
 * `-F, --format`: The format of the configuration file, must be
 either "ZIP" or "XML".
-* `-p, --predeploy-command`: This command will be "shelled out"
-to the machine running MAST prior to performing the deployment.
-Use this parameter to pull from version control or similar
-operations.
-* `-P, --postdeploy-command`: This command will be "shelled out"
-to the machine running MAST after completing the deployment, use
-this parameter to clean up VCS artifacts and/or perform check-outs
-of your deployed services or similar operations
 * `--no-quiesce-domain`: If specified, the domain will not be quiesced
 prior to the deployment.
 * `-q, --quiesce-appliance`: If specified, the appliance will be
@@ -725,17 +764,6 @@ DO NOT USE.__"""
     if web:
         output = ""
         history = ""
-
-    if predeploy_command:
-        logger.info(
-            "Pre-Deployment command '{}' found. Executing at {}".format(
-                predeploy_command, str(Timestamp())))
-
-        os.system(predeploy_command)
-
-        logger.info(
-            "finished executing Pre-Deployment command '{}' at {}.".format(
-                predeploy_command, str(Timestamp())))
 
     check_hostname = not no_check_hostname
     env = datapower.Environment(
@@ -888,17 +916,6 @@ DO NOT USE.__"""
                 output += _out[0]
                 history += _out[1]
 
-    if postdeploy_command:
-        logger.info(
-            "Post-Deployment command '{}' found. Executing at {}".format(
-                postdeploy_command, str(Timestamp())))
-
-        os.system(postdeploy_command)
-
-        logger.info(
-            "finished executing Post-Deployment command '{}' at {}.".format(
-                postdeploy_command, str(Timestamp())))
-
     if web:
         return output, history
 
@@ -912,6 +929,7 @@ def postdeploy(appliances=[],
                Domain="",
                unquiesce_domain=True,
                unquiesce_appliance=False,
+               postdeploy_command=None,
                save_config=True,
                web=False):
     """This is a simple script which will allow you to unquiesce
@@ -947,12 +965,17 @@ off when sending commands to the appliances.
 to unquiesce the domain
 * `-u, --unquiesce-appliance`: If specified, this script will attempt to
 unquiesce the appliance
+* `-p, --postdeploy-command`: This command will be "shelled out"
+to the machine running MAST after unquiescing and saving the configuration,
+use this parameter to clean up VCS artifacts and/or perform check-outs
+of your deployed services or similar operations
 * `--no-save-config`: If specified, the configuration will not be saved in
 the application domain
 * `-w, --web`: __For Internel Use Only, will be removed in future versions.
 DO NOT USE.__"""
     import mast.datapower.system as system
     check_hostname = not no_check_hostname
+    logger = make_logger('mast.datapower.deployment')
 
     env = datapower.Environment(
         appliances,
@@ -979,6 +1002,8 @@ DO NOT USE.__"""
             if web:
                 output += _out[0]
                 history += _out[1]
+            else:
+                print "Finished unquiescing appliance"
 
         if unquiesce_domain:
             appliance.log_info("Attempting to unquiesce domain")
@@ -996,22 +1021,8 @@ DO NOT USE.__"""
             if web:
                 output += _out[0]
                 history += _out[1]
-
-        if unquiesce_appliance:
-            appliance.log_info("Attempting to unquiesce appliance")
-
-            _out = system.unquiesce_appliance(
-                appliances=[appliance.hostname],
-                credentials=[appliance.credentials],
-                timeout=timeout,
-                no_check_hostname=no_check_hostname,
-                web=web)
-            appliance.log_info(
-                "Finished Unquiescing domain")
-
-            if web:
-                output += _out[0]
-                history += _out[1]
+            else:
+                print "Finished unquiescing domain"
 
         if save_config:
             appliance.log_info(
@@ -1031,9 +1042,31 @@ DO NOT USE.__"""
             if web:
                 output += _out[0]
                 history += _out[1]
+            else:
+                print "Finished saving the configuration"
+
+    if postdeploy_command:
+        logger.info(
+            "Post-Deployment command '{}' found. Executing at {}".format(
+                postdeploy_command, str(Timestamp())))
+
+        out, err = system_call(command=postdeploy_command)
+        out = str(out)
+        err = str(err)
+
+        logger.info(
+            "finished executing Post-Deployment command '{}' at {}., output: {}".format(
+                postdeploy_command, str(Timestamp()), ";".join([out, err])))
+        if web:
+            from mast.plugin_utils.plugin_utils import render_results_table
+            results = {"postdeploy command": "{}\n\nout: {}\n\nerr: {}".format(postdeploy_command, out, err)}
+            output += render_results_table(results)
+        else:
+            print "Finished running post-deploy command. output: {}".format(
+                ";".join([out, err]))
+
     if web:
         return output, history
-
 
 def get_data_file(f):
     return resource_string(__name__, 'docroot/{}'.format(f))
@@ -1064,3 +1097,4 @@ if __name__ == '__main__':
         if "No module named backups" in e:
             raise NotImplementedError(
                 "HTML formatted output is not supported on the CLI")
+                

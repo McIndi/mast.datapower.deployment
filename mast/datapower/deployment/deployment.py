@@ -569,13 +569,13 @@ Here is what is possible (will be done in this order):
                 domains.append("all-domains")
 
             _out = get_normal_backup(
-                appliance.hostname,
-                credentials,
-                timeout,
-                domains,
-                comment,
-                out_dir,
+                appliances=[appliance.hostname],
+                credentials=credentials,
+                timeout=timeout,
                 no_check_hostname=no_check_hostname,
+                Domain=domains,
+                comment=comment,
+                out_dir=out_dir,
                 web=web)
 
             logger.info(
@@ -597,13 +597,13 @@ Here is what is possible (will be done in this order):
                 domains.append("default")
 
             _out = set_checkpoint(
-                appliance.hostname,
-                credentials,
-                timeout,
-                domains,
-                comment,
-                remove_oldest_checkpoint,
+                appliances=[appliance.hostname],
+                credentials=credentials,
+                timeout=timeout,
                 no_check_hostname=no_check_hostname,
+                Domain=domains,
+                comment=comment,
+                remove_oldest=remove_oldest_checkpoint,
                 web=web)
 
             logger.info(

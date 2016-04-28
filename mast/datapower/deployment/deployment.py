@@ -960,7 +960,7 @@ an appliance for any single request. __NOTE__ Program execution may
 halt if a timeout is reached.
 * `-n, --no-check-hostname`: If specified SSL verification will be turned
 off when sending commands to the appliances.
-* `-D, --Domain`: The domain which will be unquiesced
+* `-D, --Domain`: The domain which will be unquiesced and persisted.
 * `-N, --no-unquiesce-domain`: If specified, this script will not attempt
 to unquiesce the domain
 * `-u, --unquiesce-appliance`: If specified, this script will attempt to

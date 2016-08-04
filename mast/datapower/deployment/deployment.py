@@ -674,7 +674,7 @@ def deploy(
         credentials=[],
         timeout=180,
         no_check_hostname=False,
-        Domain="",
+        Domain=[],
         file_in=None,
         deployment_policy="",
         dry_run=False,

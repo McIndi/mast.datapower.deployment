@@ -445,6 +445,7 @@ def predeploy(
         remove_secure_backup=True,
         default_checkpoint=True,
         remove_oldest_checkpoint=True,
+        allow_shell=False,
         web=False):
     """Perform routine pre-deployment actions. Everything is optional, but if
 you wish to perform an action, you must provide the necessary arguments.
@@ -504,6 +505,8 @@ default domain
 * `--no-remove-oldest-checkpoint`: Whether to remove the oldest
 checkpoint from the domain IF AND ONLY IF the maximum number
 of checkpoints has been reached.
+* `-A, --allow-shell`: Whether to allocate a shell for the execution of
+the predeploy-command
 * `-w, --web`: __For Internel Use Only, will be removed in future versions.
 DO NOT USE.__
 
@@ -648,7 +651,7 @@ Here is what is possible (will be done in this order):
             "Pre-Deployment command '{}' found. Executing at {}".format(
                 predeploy_command, str(Timestamp())))
 
-        out, err = system_call(command=predeploy_command)
+        out, err = system_call(command=predeploy_command, shell=allow_shell)
         out = str(out)
         err = str(err)
 

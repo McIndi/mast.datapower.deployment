@@ -1,4 +1,5 @@
 from mast.datapower import datapower
+from mast.plugin_utils.plugin_utils import render_history, render_results_table
 from mast.logging import make_logger
 from mast.config import get_config
 from mast.xor import xorencode
@@ -40,7 +41,9 @@ class Plan(object):
 
 
     def get_deployment_steps(self, appliance, app_domain):
+        # TODO:
         project_root = os.path.join(self.config["repo"], self.config["root"])
+
         env_dir = os.path.join(project_root, self.config["environment"])
         env_config_dir = os.path.join(env_dir, "config")
         env_local_dir = os.path.join(env_dir, "local")
@@ -369,12 +372,15 @@ def parse_config(config, environment, service):
     return ret
 
 
-def git_deploy(environment="", service="", credentials=[], out_dir="", timeout=120, dry_run=False):
+def git_deploy(environment="", service="", credentials=[], out_dir="", timeout=120, dry_run=False, web=False):
     """
     Deploy services to IBM DataPower appliances. See
     https://mcindi.github.io/mast/deploy.html for details
     on how to configure and use this script.
     """
+    if web:
+        output = ""
+        history = ""
     config = get_config("service-config.conf")
     # filter (and merge) configuration to that which is applicable to this deployment
     config = parse_config(config, environment, service)
@@ -389,7 +395,10 @@ def git_deploy(environment="", service="", credentials=[], out_dir="", timeout=1
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     for index, action in enumerate(plan):
-        print(action)
+        if web:
+            output.append({action.name: repr(action)})
+        else:
+            print(action)
         if dry_run:
             continue
         filename = os.path.join(out_dir, "{}-{}.xml".format(index, action.name))
@@ -404,7 +413,8 @@ def git_deploy(environment="", service="", credentials=[], out_dir="", timeout=1
                 fp.write(str(output))
         if "CreateDir" in action.name:
             sleep(5)
-
+    if web:
+        return render_results_table(output), render_history(environment)
 
 if __name__ == "__main__":
     cli = Cli(main=main, description=main.__doc__)

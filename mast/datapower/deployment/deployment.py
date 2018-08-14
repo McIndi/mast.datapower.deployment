@@ -1076,7 +1076,7 @@ def get_data_file(f):
     return resource_string(__name__, 'docroot/{}'.format(f))
 
 
-cli.command(git_deploy, 'git-deploy', category='deployment')
+cli.command('git-deploy', category='deployment')(git_deploy)
 
 class WebPlugin(Plugin):
     def __init__(self):

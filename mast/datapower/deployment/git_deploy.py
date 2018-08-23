@@ -416,7 +416,6 @@ def git_deploy(
         no_check_hostname=False,
         environment="",
         service="",
-        credentials=[],
         out_dir="",
         dry_run=False,
         web=False

@@ -41,7 +41,6 @@ class Plan(object):
 
 
     def get_deployment_steps(self, appliance, app_domain):
-        # TODO:
         project_root = os.path.join(self.config["repo"], self.config["root"])
 
         env_dir = os.path.join(project_root, self.config["environment"])
@@ -333,10 +332,34 @@ class Plan(object):
         """
         tmpl = appliance.hostname + "-{}-{}"
         return [
-            Action("{}-SaveCheckpoint".format(appliance.hostname), appliance.SaveCheckpoint, domain="default", ChkName="{}_{}".format("default", Timestamp().epoch)),
-            Action("{}-SaveCheckpoint".format(appliance.hostname), appliance.SaveCheckpoint, domain=app_domain, ChkName="{}_{}".format(app_domain, Timestamp().epoch)),
-            Action("{}-NormalBackup".format(appliance.hostname), appliance.get_normal_backup, domains="default"),
-            Action("{}-NormalBackup".format(appliance.hostname), appliance.get_normal_backup, domains=app_domain),
+            Action(
+                "{}-SaveCheckpoint".format(appliance.hostname),
+                appliance.SaveCheckpoint,
+                domain="default",
+                ChkName="{}_{}".format(
+                    "default",
+                    Timestamp().epoch
+                )
+            ),
+            Action(
+                "{}-SaveCheckpoint".format(appliance.hostname),
+                appliance.SaveCheckpoint,
+                domain=app_domain,
+                ChkName="{}_{}".format(
+                    app_domain,
+                    Timestamp().epoch
+                )
+            ),
+            Action(
+                "{}-NormalBackup".format(appliance.hostname),
+                appliance.get_normal_backup,
+                domains="default"
+            ),
+            Action(
+                "{}-NormalBackup".format(appliance.hostname),
+                appliance.get_normal_backup,
+                domains=app_domain
+            ),
         ]
 
 class Action(object):
@@ -361,18 +384,43 @@ class Action(object):
     def __repr__(self):
         return "<Action " + self.name + "({})>".format(", ".join(["{}={}".format(k, repr(v)) for k, v in self.kwargs.items()]))
 
-def parse_config(config, environment, service):
-    ret = {}
-    ret["appliances"] = config.get(service, "environment-{}".format(environment)).split()
-    ret["domains"] = [v.split(":")[1] for v in ret["appliances"]]
-    ret["appliances"] = [v.split(":")[0] for v in ret["appliances"]]
-    ret["environment"] = environment
+def parse_config(config, appliances, credentials, environment, service):
+    ret = {
+        "appliances": [],
+        "credentials": [],
+        "domains": [],
+        "environment": environment,
+    }
+    for index, appliance in enumerate(appliances):
+        domain = config.get(
+            service,
+            "{}-{}".format(appliance, environment),
+            None
+        )
+        if domain is None:
+            raise ValueError("Appliance '{}' not part of environment '{}'".format(
+                appliance, environment
+            ))
+        ret["appliances"].append(appliance)
+        ret["credentials"].append(credentials[index])
+        ret["domains"].append(domain)
     ret.update(config.items("global"))
     ret.update(config.items(service))
     return ret
 
 
-def git_deploy(environment="", service="", credentials=[], out_dir="", timeout=120, dry_run=False, web=False):
+def git_deploy(
+        appliances=[],
+        credentials=[],
+        timeout=120,
+        no_check_hostname=False,
+        environment="",
+        service="",
+        credentials=[],
+        out_dir="",
+        dry_run=False,
+        web=False
+    ):
     """
     Deploy services to IBM DataPower appliances. See
     https://mcindi.github.io/mast/deploy.html for details
@@ -383,13 +431,14 @@ def git_deploy(environment="", service="", credentials=[], out_dir="", timeout=1
         history = ""
     config = get_config("service-config.conf")
     # filter (and merge) configuration to that which is applicable to this deployment
-    config = parse_config(config, environment, service)
+    config = parse_config(config, appliances, credentials, environment, service)
 
     if not out_dir:
         out_dir = os.path.join(config["repo"], config["root"], "deployment-results")
-    environment = datapower.Environment(config["appliances"],
-                                        credentials=credentials,
-                                        check_hostname=False,
+    # dulwich.porceline.clone
+    environment = datapower.Environment(ret["appliances"],
+                                        credentials=ret["credentials"],
+                                        check_hostname=not no_check_hostname,
                                         timeout=timeout)
     plan = Plan(config, environment, service)
     if not os.path.exists(out_dir):

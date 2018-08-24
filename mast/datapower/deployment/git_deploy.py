@@ -8,6 +8,7 @@ from mast.timestamp import Timestamp
 from mast.cli import Cli
 from time import sleep
 from functools import partial
+from collections import OrderedDict
 import os
 
 
@@ -382,7 +383,7 @@ class Action(object):
         return self.callable()
 
     def __repr__(self):
-        return "<Action " + self.name + "({})>".format(", ".join(["{}={}".format(k, repr(v)) for k, v in self.kwargs.items()]))
+        return "<Action " + self.name + "({})>".format(", ".join(["{}={}".format(k, repr(v)) for k, v in self.kwargs.items() if "password" not in k.lower()]))
 
 def parse_config(config, appliances, credentials, environment, service):
     ret = {
@@ -426,8 +427,7 @@ def git_deploy(
     on how to configure and use this script.
     """
     if web:
-        output = ""
-        history = ""
+        output = OrderedDict()
     config = get_config("service-config.conf")
     # filter (and merge) configuration to that which is applicable to this deployment
     config = parse_config(config, appliances, credentials, environment, service)
@@ -435,8 +435,8 @@ def git_deploy(
     if not out_dir:
         out_dir = os.path.join(config["repo"], config["root"], "deployment-results")
     # dulwich.porceline.clone
-    environment = datapower.Environment(ret["appliances"],
-                                        credentials=ret["credentials"],
+    environment = datapower.Environment(config["appliances"],
+                                        credentials=config["credentials"],
                                         check_hostname=not no_check_hostname,
                                         timeout=timeout)
     plan = Plan(config, environment, service)
@@ -444,7 +444,7 @@ def git_deploy(
         os.makedirs(out_dir)
     for index, action in enumerate(plan):
         if web:
-            output.append({action.name: repr(action)})
+            output[action.name] = repr(action)
         else:
             print(action)
         if dry_run:

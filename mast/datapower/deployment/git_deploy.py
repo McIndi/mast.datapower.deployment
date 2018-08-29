@@ -2,15 +2,52 @@ from mast.datapower import datapower
 from mast.plugin_utils.plugin_utils import render_history, render_results_table
 from mast.logging import make_logger
 from mast.config import get_config
-from mast.xor import xorencode
+from mast.xor import xorencode, xordecode
 from subprocess import Popen
 from mast.timestamp import Timestamp
 from mast.cli import Cli
+from urlparse import urlparse, urlunparse
 from time import sleep
 from functools import partial
 from collections import OrderedDict
+import subprocess
+import shutil
 import os
+import contextlib
 
+
+@contextlib.contextmanager
+def working_directory(path):
+    """A context manager which changes the working directory to the given
+    path, and then changes it back to its previous value on exit.
+
+    """
+    prev_cwd = os.getcwd()
+    os.chdir(path)
+    yield
+    os.chdir(prev_cwd)
+
+def system_call(
+        command,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        shell=False):
+    """
+    # system_call
+
+    helper function to shell out commands. This should be platform
+    agnostic.
+    """
+    stderr = subprocess.STDOUT
+    pipe = subprocess.Popen(
+        command,
+        stdin=stdin,
+        stdout=stdout,
+        stderr=stderr,
+        shell=shell)
+    stdout, stderr = pipe.communicate()
+    return stdout, stderr
 
 def exists(path):
     return os.path.exists(path)
@@ -42,7 +79,7 @@ class Plan(object):
 
 
     def get_deployment_steps(self, appliance, app_domain):
-        project_root = os.path.join(self.config["repo"], self.config["root"])
+        project_root = self.config["repo_dir"]
 
         env_dir = os.path.join(project_root, self.config["environment"])
         env_config_dir = os.path.join(env_dir, "config")
@@ -62,6 +99,7 @@ class Plan(object):
         ret = []
         tmpl = appliance.hostname + "-{}-{}"
         deployment_policy = None
+        filestore = appliance.get_filestore(app_domain)
 
         if exists(env_dir):
             if exists(env_password_alias_file):
@@ -126,9 +164,11 @@ class Plan(object):
                             file_out = file_out.replace(env_local_dir, "")
                             file_out = file_out.replace(os.path.sep, "/")
                             target_dir = "/".join(file_out.split("/")[:-1])
-                            ret.append(Action("{}-CreateDir".format(appliance.hostname),
-                                              appliance.CreateDir,
-                                              Dir=target_dir))
+                            if appliance.directory_exists(target_dir, app_domain, filestore):
+                                ret.append(Action("{}-CreateDir".format(appliance.hostname),
+                                                  appliance.CreateDir,
+                                                  domain=app_domain,
+                                                  Dir=target_dir))
                             ret.append(Action("{}-set-file".format(appliance.hostname),
                                               appliance.set_file,
                                               domain=app_domain,
@@ -173,9 +213,11 @@ class Plan(object):
                         file_out = file_out.replace(common_local_dir, "")
                         file_out = file_out.replace(os.path.sep, "/")
                         target_dir = "/".join(file_out.split("/")[:-1])
-                        ret.append(Action("{}-CreateDir".format(appliance.hostname),
-                                          appliance.CreateDir,
-                                          Dir=target_dir))
+                        if appliance.directory_exists(target_dir, app_domain, filestore):
+                            ret.append(Action("{}-CreateDir".format(appliance.hostname),
+                                              appliance.CreateDir,
+                                              domain=app_domain,
+                                              Dir=target_dir))
                         ret.append(Action("{}-set-file".format(appliance.hostname),
                                           appliance.set_file,
                                           domain=app_domain,
@@ -239,9 +281,11 @@ class Plan(object):
                         file_out = file_out.replace(common_local_dir, "")
                         file_out = file_out.replace(os.path.sep, "/")
                         target_dir = "/".join(file_out.split("/")[:-1])
-                        ret.append(Action("{}-CreateDir".format(appliance.hostname),
-                                          appliance.CreateDir,
-                                          Dir=target_dir))
+                        if appliance.directory_exists(target_dir, app_domain, filestore):
+                            ret.append(Action("{}-CreateDir".format(appliance.hostname),
+                                              appliance.CreateDir,
+                                              domain=app_domain,
+                                              Dir=target_dir))
                         ret.append(Action("{}-set-file".format(appliance.hostname),
                                           appliance.set_file,
                                           domain=app_domain,
@@ -316,9 +360,11 @@ class Plan(object):
                         file_out = file_out.replace(env_local_dir, "")
                         file_out = file_out.replace(os.path.sep, "/")
                         target_dir = "/".join(file_out.split("/")[:-1])
-                        ret.append(Action("{}-CreateDir".format(appliance.hostname),
-                                          appliance.CreateDir,
-                                          Dir=target_dir))
+                        if appliance.directory_exists(target_dir, app_domain, filestore):
+                            ret.append(Action("{}-CreateDir".format(appliance.hostname),
+                                              appliance.CreateDir,
+                                              domain=app_domain,
+                                              Dir=target_dir))
                         ret.append(Action("{}-set-file".format(appliance.hostname),
                                           appliance.set_file,
                                           domain=app_domain,
@@ -403,9 +449,14 @@ def parse_config(config, appliances, credentials, environment, service):
                 appliance, environment
             ))
         ret["appliances"].append(appliance)
-        ret["credentials"].append(credentials[index])
+        if len(credentials) == 1:
+            ret["credentials"].append(credentials[0])
+        else:
+            try:
+                ret["credentials"].append(credentials[index])
+            except IndexError:
+                raise ValueError("Must provide either one set of credentials or one set for each appliance")
         ret["domains"].append(domain)
-    ret.update(config.items("global"))
     ret.update(config.items(service))
     return ret
 
@@ -417,6 +468,7 @@ def git_deploy(
         no_check_hostname=False,
         environment="",
         service="",
+        commit="",
         out_dir="",
         dry_run=False,
         web=False
@@ -433,8 +485,37 @@ def git_deploy(
     config = parse_config(config, appliances, credentials, environment, service)
 
     if not out_dir:
-        out_dir = os.path.join(config["repo"], config["root"], "deployment-results")
-    # dulwich.porceline.clone
+        out_dir = os.path.join(os.environ["MAST_HOME"], "tmp", "deployment-results")
+        print(out_dir)
+    repo_dir = os.path.join(out_dir, service)
+    config["repo_dir"] = repo_dir
+    if "subdirectory" in config:
+        config["repo_dir"] = os.path.join(config["repo_dir"], config["subdirectory"])
+    if "git-credentials" in config:
+        username, password = xordecode(config["git-credentials"]).split(":")
+        url = urlparse(config["repo"])
+        config["repo"] = "{}://{}:{}@{}{}".format(
+            url.scheme,
+            username,
+            password,
+            url.netloc,
+            url.path,
+        )
+    if exists(repo_dir):
+        with working_directory(repo_dir):
+            out, err = system_call("git pull")
+    else:
+        out, err = system_call("git clone {} {}".format(config["repo"], repo_dir))
+    if not web:
+        print(out)
+        print(err)
+    if commit:
+        with working_directory(repo_dir):
+            out, err = system_call("git checkout {}".format(commit))
+        if not web:
+            print(out)
+            print(err)
+
     environment = datapower.Environment(config["appliances"],
                                         credentials=config["credentials"],
                                         check_hostname=not no_check_hostname,
@@ -444,21 +525,24 @@ def git_deploy(
         os.makedirs(out_dir)
     for index, action in enumerate(plan):
         if web:
-            output[action.name] = repr(action)
+            output["{}-{}".format(index, action.name)] = repr(action)
         else:
             print(action)
         if dry_run:
             continue
         filename = os.path.join(out_dir, "{}-{}.xml".format(index, action.name))
-        output = action()
+        _output = action()
         if "NormalBackup" in action.name:
             filename = filename.replace(".xml", ".zip")
-        print("<Results '{}'>\n".format(filename))
+        if web:
+            output["{}-{}".format(index, action.name)] += "\n<Results '{}'>".format("{}-{}.xml".format(index, action.name))
+        else:
+            print("<Results '{}'>\n".format(filename))
         with open(filename, "wb") as fp:
             try:
-                fp.write(output)
+                fp.write(_output)
             except TypeError:
-                fp.write(str(output))
+                fp.write(str(_output))
         if "CreateDir" in action.name:
             sleep(5)
     if web:

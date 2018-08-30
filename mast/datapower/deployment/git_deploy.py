@@ -7,6 +7,7 @@ from subprocess import Popen
 from mast.timestamp import Timestamp
 from mast.cli import Cli
 from urlparse import urlparse, urlunparse
+from urllib import quote_plus
 from time import sleep
 from functools import partial
 from collections import OrderedDict
@@ -494,10 +495,11 @@ def git_deploy(
     if "git-credentials" in config:
         username, password = xordecode(config["git-credentials"]).split(":")
         url = urlparse(config["repo"])
+        print(quote_plus(password))
         config["repo"] = "{}://{}:{}@{}{}".format(
             url.scheme,
-            username,
-            password,
+            quote_plus(username),
+            quote_plus(password),
             url.netloc,
             url.path,
         )

@@ -165,7 +165,7 @@ class Plan(object):
                             file_out = file_out.replace(env_local_dir, "")
                             file_out = file_out.replace(os.path.sep, "/")
                             target_dir = "/".join(file_out.split("/")[:-1])
-                            if appliance.directory_exists(target_dir, app_domain, filestore):
+                            if not appliance.directory_exists(target_dir, app_domain, filestore):
                                 ret.append(Action("{}-CreateDir".format(appliance.hostname),
                                                   appliance.CreateDir,
                                                   domain=app_domain,
@@ -214,7 +214,7 @@ class Plan(object):
                         file_out = file_out.replace(common_local_dir, "")
                         file_out = file_out.replace(os.path.sep, "/")
                         target_dir = "/".join(file_out.split("/")[:-1])
-                        if appliance.directory_exists(target_dir, app_domain, filestore):
+                        if not appliance.directory_exists(target_dir, app_domain, filestore):
                             ret.append(Action("{}-CreateDir".format(appliance.hostname),
                                               appliance.CreateDir,
                                               domain=app_domain,
@@ -282,7 +282,7 @@ class Plan(object):
                         file_out = file_out.replace(common_local_dir, "")
                         file_out = file_out.replace(os.path.sep, "/")
                         target_dir = "/".join(file_out.split("/")[:-1])
-                        if appliance.directory_exists(target_dir, app_domain, filestore):
+                        if not appliance.directory_exists(target_dir, app_domain, filestore):
                             ret.append(Action("{}-CreateDir".format(appliance.hostname),
                                               appliance.CreateDir,
                                               domain=app_domain,
@@ -361,7 +361,7 @@ class Plan(object):
                         file_out = file_out.replace(env_local_dir, "")
                         file_out = file_out.replace(os.path.sep, "/")
                         target_dir = "/".join(file_out.split("/")[:-1])
-                        if appliance.directory_exists(target_dir, app_domain, filestore):
+                        if not appliance.directory_exists(target_dir, app_domain, filestore):
                             ret.append(Action("{}-CreateDir".format(appliance.hostname),
                                               appliance.CreateDir,
                                               domain=app_domain,

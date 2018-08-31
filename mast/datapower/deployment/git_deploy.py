@@ -487,7 +487,6 @@ def git_deploy(
 
     if not out_dir:
         out_dir = os.path.join(os.environ["MAST_HOME"], "tmp", "deployment-results")
-        print(out_dir)
     repo_dir = os.path.join(out_dir, service)
     config["repo_dir"] = repo_dir
     if "subdirectory" in config:
@@ -495,7 +494,6 @@ def git_deploy(
     if "git-credentials" in config:
         username, password = xordecode(config["git-credentials"]).split(":")
         url = urlparse(config["repo"])
-        print(quote_plus(password))
         config["repo"] = "{}://{}:{}@{}{}".format(
             url.scheme,
             quote_plus(username),

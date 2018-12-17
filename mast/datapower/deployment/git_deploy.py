@@ -102,110 +102,66 @@ class Plan(object):
         deployment_policy = None
         filestore = appliance.get_filestore(app_domain)
 
-        if exists(env_dir):
-            if exists(env_password_alias_file):
-                with open(env_password_alias_file, "r") as fp:
-                    for line in fp:
-                        name, password = line.split(":")
-                        ret.extend([
-                            Action("{}-AddPasswordMap".format(appliance.hostname),
-                                   appliance.AddPasswordMap,
-                                   domain=app_domain,
-                                   AliasName=name.strip(),
-                                   Password=password.strip())
-                        ])
-            if exists(env_deppol_dir):
-                if len(filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))) > 1:
-                    raise ValueError("Only one deployment policy permitted.")
+        if exists(common_pubcert_dir):
+            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(common_pubcert_dir)):
                 ret.extend([
-                    Action("{}-import".format(appliance.hostname),
-                           appliance.do_import,
-                           domain=app_domain,
-                           zip_file=os.path.join(env_deppol_dir, filename),
-                           source_type="XML")
-                    for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))
+                    Action("{}-set-file".format(appliance.hostname),
+                           appliance.set_file,
+                           domain="default",
+                           file_in=os.path.join(common_pubcert_dir, filename),
+                           file_out="pubcert:///{}".format(filename),
+                    )
                 ])
-                deployment_policy = filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))[0]
-                deployment_policy = ".".join(deployment_policy.split(".")[:-1])
-            if exists(env_cert_dir):
-                for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_cert_dir)):
-                    ret.extend([
-                        Action("{}-set-file".format(appliance.hostname),
-                               appliance.set_file,
-                               domain=app_domain,
-                               file_in=os.path.join(env_cert_dir, filename),
-                               file_out="cert:///{}".format(filename),
-                        )
-                    ])
-            if exists(env_pubcert_dir):
-                for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_pubcert_dir)):
-                    ret.extend([
-                        Action("{}-set-file".format(appliance.hostname),
-                               appliance.set_file,
-                               domain="default",
-                               file_in=os.path.join(env_pubcert_dir, filename),
-                               file_out="pubcert:///{}".format(filename),
-                        )
-                    ])
-            if exists(env_sharedcert_dir):
-                for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_sharedcert_dir)):
-                    ret.extend([
-                        Action("{}-set-file".format(appliance.hostname),
-                               appliance.set_file,
-                               domain="default",
-                               file_in=os.path.join(env_sharedcert_dir, filename),
-                               file_out="sharedcert:///{}".format(filename),
-                        )
-                    ])
-            if exists(env_local_dir):
-                for root, dirs, files in os.walk(env_local_dir):
-                    if files:
-                        for filename in filter(lambda x: "EMPTY" not in x, files):
-                            file_out = "local://{}".format(os.path.join(root, filename))
-                            file_out = file_out.replace(env_local_dir, "")
-                            file_out = file_out.replace(os.path.sep, "/")
-                            target_dir = "/".join(file_out.split("/")[:-1])
-                            if not appliance.directory_exists(target_dir, app_domain, filestore):
-                                ret.append(Action("{}-CreateDir".format(appliance.hostname),
-                                                  appliance.CreateDir,
-                                                  domain=app_domain,
-                                                  Dir=target_dir))
-                            ret.append(Action("{}-set-file".format(appliance.hostname),
-                                              appliance.set_file,
-                                              domain=app_domain,
-                                              file_in=os.path.join(root, filename),
-                                              file_out=file_out))
-            if exists(env_config_dir):
-                if deployment_policy:
-                    ret.extend([
-                        Action("{}-import".format(appliance.hostname),
-                               appliance.do_import,
-                               domain=app_domain,
-                               deployment_policy=deployment_policy,
-                               zip_file=os.path.join(env_config_dir, filename),
-                               source_type="XML")
-                        for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_config_dir))
-                    ])
-                else:
-                    ret.extend([
-                        Action("{}-import".format(appliance.hostname),
-                               appliance.do_import,
-                               domain=app_domain,
-                               zip_file=os.path.join(env_config_dir, filename),
-                               source_type="XML")
-                        for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_config_dir))
-                    ])
-        if exists(common_password_alias_file):
-            with open(common_password_alias_file, "r") as fp:
-                for line in fp:
-                    name, password = line.split(":")
-                    ret.extend([
-                        Action("{}-AddPasswordMap".format(appliance.hostname),
-                               appliance.AddPasswordMap,
-                               domain=app_domain,
-                               AliasName=name.strip(),
-                               Password=password.strip())
-                    ])
+        if exists(common_cert_dir):
+            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(common_cert_dir)):
+                ret.extend([
+                    Action("{}-set-file".format(appliance.hostname),
+                           appliance.set_file,
+                           domain=app_domain,
+                           file_in=os.path.join(common_cert_dir, filename),
+                           file_out="cert:///{}".format(filename),
+                    )
+                ])
+        if exists(common_sharedcert_dir):
+            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(common_sharedcert_dir)):
+                ret.extend([
+                    Action("{}-set-file".format(appliance.hostname),
+                           appliance.set_file,
+                           domain="default",
+                           file_in=os.path.join(common_sharedcert_dir, filename),
+                           file_out="sharedcert:///{}".format(filename),
+                    )
+                ])
+        if exists(env_pubcert_dir):
+            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_pubcert_dir)):
+                ret.extend([
+                    Action("{}-set-file".format(appliance.hostname),
+                           appliance.set_file,
+                           domain="default",
+                           file_in=os.path.join(env_pubcert_dir, filename),
+                           file_out="pubcert:///{}".format(filename),
+                    )
+                ])
+        if exists(env_cert_dir):
+            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_cert_dir)):
+                ret.extend([
+                    Action("{}-set-file".format(appliance.hostname),
+                           appliance.set_file,
+                           domain=app_domain,
+                           file_in=os.path.join(env_cert_dir, filename),
+                           file_out="cert:///{}".format(filename),
+                    )
+                ])
+        if exists(env_sharedcert_dir):
+            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_sharedcert_dir)):
+                ret.extend([
+                    Action("{}-set-file".format(appliance.hostname),
+                           appliance.set_file,
+                           domain="default",
+                           file_in=os.path.join(env_sharedcert_dir, filename),
+                           file_out="sharedcert:///{}".format(filename),
+                    )
+                ])
         if exists(common_local_dir):
             for root, dirs, files in os.walk(common_local_dir):
                 if files:
@@ -224,36 +180,59 @@ class Plan(object):
                                           domain=app_domain,
                                           file_in=os.path.join(root, filename),
                                           file_out=file_out))
-        if exists(common_cert_dir):
-            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(common_cert_dir)):
-                ret.extend([
-                    Action("{}-set-file".format(appliance.hostname),
-                           appliance.set_file,
-                           domain=app_domain,
-                           file_in=os.path.join(common_cert_dir, filename),
-                           file_out="cert:///{}".format(filename),
-                    )
-                ])
-        if exists(common_pubcert_dir):
-            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(common_pubcert_dir)):
-                ret.extend([
-                    Action("{}-set-file".format(appliance.hostname),
-                           appliance.set_file,
-                           domain="default",
-                           file_in=os.path.join(common_pubcert_dir, filename),
-                           file_out="pubcert:///{}".format(filename),
-                    )
-                ])
-        if exists(common_sharedcert_dir):
-            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(common_sharedcert_dir)):
-                ret.extend([
-                    Action("{}-set-file".format(appliance.hostname),
-                           appliance.set_file,
-                           domain="default",
-                           file_in=os.path.join(common_sharedcert_dir, filename),
-                           file_out="sharedcert:///{}".format(filename),
-                    )
-                ])
+        if exists(env_local_dir):
+            for root, dirs, files in os.walk(env_local_dir):
+                if files:
+                    for filename in filter(lambda x: "EMPTY" not in x, files):
+                        file_out = "local://{}".format(os.path.join(root, filename))
+                        file_out = file_out.replace(env_local_dir, "")
+                        file_out = file_out.replace(os.path.sep, "/")
+                        target_dir = "/".join(file_out.split("/")[:-1])
+                        if not appliance.directory_exists(target_dir, app_domain, filestore):
+                            ret.append(Action("{}-CreateDir".format(appliance.hostname),
+                                              appliance.CreateDir,
+                                              domain=app_domain,
+                                              Dir=target_dir))
+                        ret.append(Action("{}-set-file".format(appliance.hostname),
+                                          appliance.set_file,
+                                          domain=app_domain,
+                                          file_in=os.path.join(root, filename),
+                                          file_out=file_out))
+        if exists(env_deppol_dir):
+            if len(filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))) > 1:
+                raise ValueError("Only one deployment policy permitted.")
+            ret.extend([
+                Action("{}-import".format(appliance.hostname),
+                       appliance.do_import,
+                       domain=app_domain,
+                       zip_file=os.path.join(env_deppol_dir, filename),
+                       source_type="XML")
+                for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))
+            ])
+            deployment_policy = filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))[0]
+            deployment_policy = ".".join(deployment_policy.split(".")[:-1])
+        if exists(common_password_alias_file):
+            with open(common_password_alias_file, "r") as fp:
+                for line in fp:
+                    name, password = line.split(":")
+                    ret.extend([
+                        Action("{}-AddPasswordMap".format(appliance.hostname),
+                               appliance.AddPasswordMap,
+                               domain=app_domain,
+                               AliasName=name.strip(),
+                               Password=password.strip())
+                    ])
+        if exists(env_password_alias_file):
+            with open(env_password_alias_file, "r") as fp:
+                for line in fp:
+                    name, password = line.split(":")
+                    ret.extend([
+                        Action("{}-AddPasswordMap".format(appliance.hostname),
+                               appliance.AddPasswordMap,
+                               domain=app_domain,
+                               AliasName=name.strip(),
+                               Password=password.strip())
+                    ])
         if exists(common_config_dir):
             if deployment_policy:
                 ret.extend([
@@ -274,103 +253,26 @@ class Plan(object):
                            source_type="XML")
                     for filename in filter(lambda x: "EMPTY" not in x, os.listdir(common_config_dir))
                 ])
-        if exists(common_local_dir):
-            for root, dirs, files in os.walk(common_local_dir):
-                if files:
-                    for filename in filter(lambda x: "EMPTY" not in x, files):
-                        file_out = "local://{}".format(os.path.join(root, filename))
-                        file_out = file_out.replace(common_local_dir, "")
-                        file_out = file_out.replace(os.path.sep, "/")
-                        target_dir = "/".join(file_out.split("/")[:-1])
-                        if not appliance.directory_exists(target_dir, app_domain, filestore):
-                            ret.append(Action("{}-CreateDir".format(appliance.hostname),
-                                              appliance.CreateDir,
-                                              domain=app_domain,
-                                              Dir=target_dir))
-                        ret.append(Action("{}-set-file".format(appliance.hostname),
-                                          appliance.set_file,
-                                          domain=app_domain,
-                                          file_in=os.path.join(root, filename),
-                                          file_out=file_out))
-
-        if exists(common_cert_dir):
-            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(common_cert_dir)):
+        if exists(env_config_dir):
+            if deployment_policy:
                 ret.extend([
-                    Action("{}-set-file".format(appliance.hostname),
-                           appliance.set_file,
+                    Action("{}-import".format(appliance.hostname),
+                           appliance.do_import,
                            domain=app_domain,
-                           file_in=os.path.join(common_cert_dir, filename),
-                           file_out="cert:///{}".format(filename),
-                    )
+                           deployment_policy=deployment_policy,
+                           zip_file=os.path.join(env_config_dir, filename),
+                           source_type="XML")
+                    for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_config_dir))
                 ])
-        if exists(common_pubcert_dir):
-            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(common_pubcert_dir)):
+            else:
                 ret.extend([
-                    Action("{}-set-file".format(appliance.hostname),
-                           appliance.set_file,
-                           domain="default",
-                           file_in=os.path.join(common_pubcert_dir, filename),
-                           file_out="pubcert:///{}".format(filename),
-                    )
-                ])
-        if exists(common_sharedcert_dir):
-            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(common_sharedcert_dir)):
-                ret.extend([
-                    Action("{}-set-file".format(appliance.hostname),
-                           appliance.set_file,
-                           domain="default",
-                           file_in=os.path.join(common_sharedcert_dir, filename),
-                           file_out="sharedcert:///{}".format(filename),
-                    )
-                ])
-        if exists(env_cert_dir):
-            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_cert_dir)):
-                ret.extend([
-                    Action("{}-set-file".format(appliance.hostname),
-                           appliance.set_file,
+                    Action("{}-import".format(appliance.hostname),
+                           appliance.do_import,
                            domain=app_domain,
-                           file_in=os.path.join(env_cert_dir, filename),
-                           file_out="cert:///{}".format(filename),
-                    )
+                           zip_file=os.path.join(env_config_dir, filename),
+                           source_type="XML")
+                    for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_config_dir))
                 ])
-        if exists(env_pubcert_dir):
-            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_pubcert_dir)):
-                ret.extend([
-                    Action("{}-set-file".format(appliance.hostname),
-                           appliance.set_file,
-                           domain="default",
-                           file_in=os.path.join(env_pubcert_dir, filename),
-                           file_out="pubcert:///{}".format(filename),
-                    )
-                ])
-        if exists(env_sharedcert_dir):
-            for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_sharedcert_dir)):
-                ret.extend([
-                    Action("{}-set-file".format(appliance.hostname),
-                           appliance.set_file,
-                           domain="default",
-                           file_in=os.path.join(env_sharedcert_dir, filename),
-                           file_out="sharedcert:///{}".format(filename),
-                    )
-                ])
-        if exists(env_local_dir):
-            for root, dirs, files in os.walk(env_local_dir):
-                if files:
-                    for filename in filter(lambda x: "EMPTY" not in x, files):
-                        file_out = "local://{}".format(os.path.join(root, filename))
-                        file_out = file_out.replace(env_local_dir, "")
-                        file_out = file_out.replace(os.path.sep, "/")
-                        target_dir = "/".join(file_out.split("/")[:-1])
-                        if not appliance.directory_exists(target_dir, app_domain, filestore):
-                            ret.append(Action("{}-CreateDir".format(appliance.hostname),
-                                              appliance.CreateDir,
-                                              domain=app_domain,
-                                              Dir=target_dir))
-                        ret.append(Action("{}-set-file".format(appliance.hostname),
-                                          appliance.set_file,
-                                          domain=app_domain,
-                                          file_in=os.path.join(root, filename),
-                                          file_out=file_out))
         return ret
 
 
@@ -479,6 +381,7 @@ def git_deploy(
     https://mcindi.github.io/mast/deploy.html for details
     on how to configure and use this script.
     """
+    log = make_logger("mast.datapower.deployment.git-deploy")
     if web:
         output = OrderedDict()
     config = get_config("service-config.conf")
@@ -502,26 +405,32 @@ def git_deploy(
             url.path,
         )
     if exists(repo_dir):
+        log.info("Existing local repository found, pulling latest changes")
         with working_directory(repo_dir):
             out, err = system_call("git pull")
     else:
+        log.info("cloning repo '{}' to '{}'".format(config["repo"], repo_dir))
         out, err = system_call("git clone {} {}".format(config["repo"], repo_dir))
     if not web:
         print(out)
         print(err)
     if commit:
         with working_directory(repo_dir):
+            log.info("performing 'git checkout {}'".format(commit))
             out, err = system_call("git checkout {}".format(commit))
         if not web:
             print(out)
             print(err)
 
-    environment = datapower.Environment(config["appliances"],
-                                        credentials=config["credentials"],
-                                        check_hostname=not no_check_hostname,
-                                        timeout=timeout)
+    environment = datapower.Environment(
+        config["appliances"],
+        credentials=config["credentials"],
+        check_hostname=not no_check_hostname,
+        timeout=timeout
+    )
     plan = Plan(config, environment, service)
     if not os.path.exists(out_dir):
+        log.info("'{}' does not exist, creating...".format(out_dir))
         os.makedirs(out_dir)
     for index, action in enumerate(plan):
         if web:
@@ -530,7 +439,8 @@ def git_deploy(
             print(action)
         if dry_run:
             continue
-        filename = os.path.join(out_dir, "{}-{}.xml".format(index, action.name))
+        filename = os.path.join(out_dir, "{}-{}-response.xml".format(index, action.name))
+        log.info("Executing action '{}'".format(action))
         _output = action()
         if "NormalBackup" in action.name:
             filename = filename.replace(".xml", ".zip")
@@ -538,6 +448,7 @@ def git_deploy(
             output["{}-{}".format(index, action.name)] += "\n<Results '{}'>".format("{}-{}.xml".format(index, action.name))
         else:
             print("<Results '{}'>\n".format(filename))
+        log.info("Storing response in '{}'".format(filename))
         with open(filename, "wb") as fp:
             try:
                 fp.write(_output)

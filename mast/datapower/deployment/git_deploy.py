@@ -304,6 +304,10 @@ class Plan(object):
         if exists(env_deppol_dir):
             if len(filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))) > 1:
                 raise ValueError("Only one deployment policy permitted.")
+            deployment_policy_filename = filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))[0]
+            deployment_policy_filename = os.path.join(env_deppol_dir, deployment_policy_filename)
+            tree = etree.parse(deployment_policy_filename)
+            deployment_policy = tree.find(".//ConfigDeploymentPolicy").get("name")
             ret.extend([
                 Action(
                     appliance,
@@ -316,8 +320,6 @@ class Plan(object):
                 )
                 for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))
             ])
-            deployment_policy = filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))[0]
-            deployment_policy = ".".join(deployment_policy.split(".")[:-1])
         if exists(common_password_alias_file):
             with open(common_password_alias_file, "r") as fp:
                 for line in fp:
@@ -711,7 +713,7 @@ before quiescing the service
 * `-Q, --quiesce-timeout`: The maximum number of seconds for the datapower to
 wait for the service to quiesce before abruptly terminating it.
 * `-s, --save-config`: If specified, the app domains configuration will be
-saved after the deployment is complete 
+saved after the deployment is complete
     """
     log = make_logger("mast.datapower.deployment.git-deploy")
     if web:

@@ -567,16 +567,16 @@ class Action(object):
 
     def __call__(self):
         log = make_logger("mast.datapower.deployment.git-deploy")
-        if "save-config" in self.name:
-            filename = os.path.join(self.config["audit_dir"], "{}.xml".format(self.appliance.hostname))
-            log.info(
-                "auditing configuration changes for '{}', "
-                "results can be found in '{}'".format(
-                    self.appliance.hostname, filename
-                )
-            )
-            with open(filename, "w") as fp:
-                fp.write(self.appliance.object_audit())
+        # if "save-config" in self.name:
+        #     filename = os.path.join(self.config["audit_dir"], "{}.xml".format(self.appliance.hostname))
+        #     log.info(
+        #         "auditing configuration changes for '{}', "
+        #         "results can be found in '{}'".format(
+        #             self.appliance.hostname, filename
+        #         )
+        #     )
+        #     with open(filename, "w") as fp:
+        #         fp.write(self.appliance.object_audit())
 
         ret = self.callable()
         req_file = os.path.join(
@@ -783,7 +783,7 @@ saved after the deployment is complete
         config["appliances"],
         credentials=config["credentials"],
         check_hostname=not no_check_hostname,
-        timeout=timeout
+        timeout=timeout,
     )
     plan = Plan(config, environment, service)
     if not os.path.exists(out_dir):

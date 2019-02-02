@@ -1,5 +1,6 @@
 from mast.datapower import datapower
 from mast.plugin_utils.plugin_utils import render_history, render_results_table
+from collections import Counter
 from mast.logging import make_logger
 from mast.config import get_config
 from mast.xor import xorencode, xordecode
@@ -8,7 +9,7 @@ from mast.timestamp import Timestamp
 from mast.cli import Cli
 from urlparse import urlparse, urlunparse
 from urllib import quote_plus
-from time import sleep
+from time import sleep, time
 from functools import partial
 from collections import OrderedDict, defaultdict
 import xml.etree.cElementTree as etree
@@ -35,7 +36,8 @@ def system_call(
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        shell=False):
+        shell=True,
+    ):
     """
     # system_call
 
@@ -48,7 +50,8 @@ def system_call(
         stdin=stdin,
         stdout=stdout,
         stderr=stderr,
-        shell=shell)
+        shell=shell,
+    )
     stdout, stderr = pipe.communicate()
     return stdout, stderr
 
@@ -64,7 +67,8 @@ def quit_for_local_uploads(config_dir):
             raise ValueError(
                 "configuration '{}' contains files meant to "
                 "be uploaded to 'local', this is not allowed. "
-                "Use the force option to perform this deployment anyway. ".format(
+                "Use the allow_files_in_export option to perform "
+                "this deployment anyway. ".format(
                     filename
                 )
             )
@@ -82,6 +86,61 @@ DATAPOWER_SERVICE_TYPES = [
     "SSLProxyService",
     "APIGateway",
 ]
+
+def wait_for_quiesce(appliance, app_domain, services, timeout):
+    start = time()
+    while True:
+        sleep(5)
+        done = []
+        object_status = appliance.get_status("ObjectStatus", domain=app_domain)
+        for service in services:
+            _class = service["type"]
+            name = service["name"]
+            status = list(
+                filter(
+                    lambda _status: _status.findtext("Class") == _class and _status.findtext("Name") == name,
+                    object_status.xml.findall(".//ObjectStatus"),
+                )
+            )
+            if not len(status):
+                # Service Does not exist
+                done.append(True)
+                continue
+            status = status[0]
+            if status.findtext("ErrorCode") == "in quiescence":
+                done.append(True)
+            else:
+                done.append(False)
+        if all(done):
+            break
+        if time() - start > timeout:
+            break
+
+def wait_for_unquiesce(appliance, app_domain, services, timeout):
+    start = time()
+    while True:
+        sleep(5)
+        done = []
+        object_status = appliance.get_status("ObjectStatus", domain=app_domain)
+        for service in services:
+            _class = service["type"]
+            name = service["name"]
+            status = list(
+                filter(
+                    lambda _status: _status.findtext("Class") == _class and _status.findtext("Name") == name,
+                    object_status.xml.findall(".//ObjectStatus"),
+                )
+            )
+            status = status[0]
+            if status.findtext("ErrorCode") != "in quiescence":
+                done.append(True)
+            else:
+                done.append(False)
+        if all(done):
+            break
+        if time() - start > timeout:
+            break
+
 
 class Plan(object):
     """A class representing a plan of action for the deployment.
@@ -164,10 +223,9 @@ class Plan(object):
         log = make_logger("mast.datapower.deployment.git-deploy")
         output = OrderedDict()
         for index, action in enumerate(self):
-            if not self.config["web"]:
-                print("\nStep {}, {}".format(index, action.name))
-                for k, v in action.kwargs.items():
-                    print("\t{}={}".format(k, v))
+            print("\nStep {}, {}".format(index, action.name))
+            for k, v in action.kwargs.items():
+                print("\t{}={}".format(k, v))
             log.info("Executing action '{}'".format(repr(action)))
             response = action()
             try:
@@ -187,8 +245,6 @@ class Plan(object):
                 elif "quiesce" in action.name and "unquiesce" not in action.name:
                     output[key] = "Result: {}".format("\n\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext()))
                     delay = self.config["quiesce_timeout"] + self.config["quiesce_delay"]
-                    log.info("sleeping for {} seconds".format(delay))
-                    sleep(delay)
                 elif "ObjectStatus" in action.name:
                     output[key] = "Down but Enabled Objects"
                     readings = response_tree.findall(".//ObjectStatus")
@@ -223,49 +279,47 @@ class Plan(object):
                     output[key] = "Backup can be downloaded above"
                 elif "save-config" in action.name:
                     output[key] = "Result: {}".format("\n\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext()))
-            else:
-                # CLI mode
-                if "CreateDir" in action.name:
-                    print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
-                    log.info("sleeping for 5 seconds")
-                    sleep(5)
-                elif "quiesce" in action.name and "unquiesce" not in action.name:
-                    print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
-                    delay = self.config["quiesce_timeout"] + self.config["quiesce_delay"]
-                    log.info("sleeping for {} seconds".format(delay))
-                    sleep(delay)
-                elif "ObjectStatus" in action.name:
-                    readings = response_tree.findall(".//ObjectStatus")
-                    readings = filter(lambda node: node.findtext("OpState") == "down", readings)
-                    readings = filter(lambda node: node.findtext("AdminState") == "enabled", readings)
-                    print("\n\tDown but Enabled Objects")
-                    for reading in readings:
-                        print("\t\t{} {} ({})".format(reading.findtext("Class"), reading.findtext("Name"), reading.findtext("ErrorCode")))
+            if "CreateDir" in action.name:
+                print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
+                log.info("sleeping for 5 seconds")
+                sleep(5)
+            elif "quiesce" in action.name and "unquiesce" not in action.name:
+                print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
+                delay = self.config["quiesce_timeout"] + self.config["quiesce_delay"]
+                wait_for_quiesce(action.appliance, action.kwargs["domain"], self._services, self.config["quiesce_timeout"]+15)
+            elif "ObjectStatus" in action.name:
+                readings = response_tree.findall(".//ObjectStatus")
+                readings = filter(lambda node: node.findtext("OpState") == "down", readings)
+                readings = filter(lambda node: node.findtext("AdminState") == "enabled", readings)
+                print("\n\tDown but Enabled Objects")
+                for reading in readings:
+                    print("\t\t{} {} ({})".format(reading.findtext("Class"), reading.findtext("Name"), reading.findtext("ErrorCode")))
 
-                elif "password-map-alias" in action.name:
-                    print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
-                elif "upload"  in action.name:
-                    print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
-                elif "import" in action.name:
-                    print("\n\tImported Files")
-                    for file_node in response_tree.findall(".//imported-files/*"):
-                        print("\t\t{} {}".format(file_node.get("name"), file_node.get("status")))
-                    print("\tImported Objects")
-                    for file_node in response_tree.findall(".//imported-objects/*"):
-                        print("\t\t{} {} {}".format(file_node.get("class"), file_node.get("name"), file_node.get("status")))
-                    print("\tExec Script Results")
-                    for file_node in response_tree.findall(".//exec-script-results/*"):
-                        print("\t\t{} {} {}".format(file_node.get("class"), file_node.get("name"), file_node.get("status")))
-                elif "unquiesce" in action.name:
-                    print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
-                elif "remove-oldest-checkpoint" in action.name:
-                    print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
-                elif "SaveCheckpoint" in action.name:
-                    print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
-                elif "NormalBackup" in action.name:
-                    print("\n\tBackup Saved to '{}'".format(action.resp_file))
-                elif "save-config" in action.name:
-                    print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
+            elif "password-map-alias" in action.name:
+                print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
+            elif "upload"  in action.name:
+                print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
+            elif "import" in action.name:
+                print("\n\tImported Files")
+                for file_node in response_tree.findall(".//imported-files/*"):
+                    print("\t\t{} {}".format(file_node.get("name"), file_node.get("status")))
+                print("\tImported Objects")
+                for file_node in response_tree.findall(".//imported-objects/*"):
+                    print("\t\t{} {} {}".format(file_node.get("class"), file_node.get("name"), file_node.get("status")))
+                print("\tExec Script Results")
+                for file_node in response_tree.findall(".//exec-script-results/*"):
+                    print("\t\t{} {} {}".format(file_node.get("class"), file_node.get("name"), file_node.get("status")))
+            elif "unquiesce" in action.name:
+                print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
+                wait_for_unquiesce(action.appliance, action.kwargs["domain"], self._services, self.config["timeout"])
+            elif "remove-oldest-checkpoint" in action.name:
+                print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
+            elif "SaveCheckpoint" in action.name:
+                print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
+            elif "NormalBackup" in action.name:
+                print("\n\tBackup Saved to '{}'".format(action.resp_file))
+            elif "save-config" in action.name:
+                print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
         if self.config["web"]:
             return render_results_table(output), render_history(self.environment)
 
@@ -275,27 +329,31 @@ class Plan(object):
             xcfg = etree.parse(kwargs["zip_file"])
             for obj in xcfg.findall(r'.//configuration/*'):
                 if obj.tag in DATAPOWER_SERVICE_TYPES:
-                    ret.append(
-                        {
-                            "type": obj.tag,
-                            "name": obj.get("name"),
-                        }
-                    )
+                    service = {
+                        "type": obj.tag,
+                        "name": obj.get("name"),
+                    }                    
+                    if service not in ret:
+                        ret.append(service)
         return ret
 
     def _plan(self):
         """Build a plan,
         """
+        project_root = self.config["repo_dir"]
+        env_dir = os.path.join(project_root, self.config["environment"])
+        env_config_dir = os.path.join(env_dir, "config")
+
         ret = []
         for appliance in self.environment.appliances:
             app_domain = self.config["domains"][self.config["appliances"].index(appliance.hostname)]
-            filestore = appliance.get_filestore(app_domain)
-            if app_domain  not in appliance.domains:
-                raise ValueError("Domain '{}' does not exist on appliance '{}'")
-            # when checking appliances domains (two lines above), a
-            # domain status request is issued, we reuse this here to
-            # see if a save is needed
-            if not self.config["force"]:
+
+            if app_domain not in appliance.domains:
+                raise ValueError("Domain '{}' does not exist on appliance '{}'".format(app_domain, appliance.hostname))
+            if not self.config["ignore_save_needed"]:
+                # when checking appliances domains (three lines above), a
+                # domain status request is issued, we reuse this here to
+                # see if a save is needed
                 domain_status = etree.fromstring(appliance.last_response)
                 save_needed = list(
                     filter(
@@ -306,8 +364,11 @@ class Plan(object):
                 if save_needed == "on":
                     raise ValueError(
                         "domain '{}' on appliance '{}' "
-                        "needs to be saved. Use force option "
-                        "to deploy anyway".format(appliance.hostname, app_domain)
+                        "needs to be saved. Use ignore_save_needed option "
+                        "to deploy anyway".format(
+                            appliance.hostname, 
+                            app_domain
+                        )
                     )
 
             # Have to get object status first, if we are getting it
@@ -324,7 +385,11 @@ class Plan(object):
                 )
 
             if self.config["quiesce"]:
+                services_to_quiesce = []
                 for kwargs in self._services:
+                    if kwargs in services_to_quiesce:
+                        continue
+                    services_to_quiesce.append(kwargs)
                     ret.append(
                         Action(
                             appliance,
@@ -350,7 +415,7 @@ class Plan(object):
                         **kwargs
                     )
                 )
-
+            filestore = appliance.get_filestore(app_domain)
             self.dirs_to_create = defaultdict(list)
             for filename, kwargs in self._uploads.items():
                 file_out = kwargs["file_out"]
@@ -401,20 +466,33 @@ class Plan(object):
                 )
             )
             for kwargs in self._imports:
-                ret.append(
-                    Action(
-                        appliance,
-                        self.config,
-                        "{}-import".format(appliance.hostname),
-                        appliance.do_import,
-                        domain=app_domain,
-                        deployment_policy=self.deployment_policy,
-                        **kwargs
+                if env_config_dir in kwargs["zip_file"]:
+                    # Do not apply deployment policy to env-specific imports
+                    ret.append(
+                        Action(
+                            appliance,
+                            self.config,
+                            "{}-import".format(appliance.hostname),
+                            appliance.do_import,
+                            domain=app_domain,
+                            **kwargs
+                        )
                     )
-                )
+                else:
+                    ret.append(
+                        Action(
+                            appliance,
+                            self.config,
+                            "{}-import".format(appliance.hostname),
+                            appliance.do_import,
+                            domain=app_domain,
+                            deployment_policy=self.deployment_policy,
+                            **kwargs
+                        )
+                    )
 
             if self.config["quiesce"]:
-                for kwargs in self._services:
+                for kwargs in services_to_quiesce:
                     ret.append(
                         Action(
                             appliance,
@@ -464,7 +542,7 @@ class Plan(object):
 
         # Service imports
         if exists(common_config_dir):
-            if not self.config["force"]:
+            if not self.config["allow_files_in_export"]:
                 quit_for_local_uploads(common_config_dir)
             ret.extend(
                 [
@@ -477,7 +555,7 @@ class Plan(object):
             )
 
         if exists(env_config_dir):
-            if not self.config["force"]:
+            if not self.config["allow_files_in_export"]:
                 quit_for_local_uploads(env_config_dir)
             ret.extend(
                 [
@@ -496,62 +574,75 @@ class Plan(object):
         in the default domain and the app domain.
         """
         ret = []
-        if self.config["checkpoint"]:
-            for domain in [app_domain, "default"]:
-                if len(appliance.get_existing_checkpoints(domain)) == appliance.max_checkpoints(domain):
-                    ret.append(
-                        Action(
-                            appliance,
-                            self.config,
-                            "{}-remove-oldest-checkpoint".format(appliance.hostname),
-                            appliance.remove_oldest_checkpoint,
-                            domain=domain,
-                        )
-                    )
-        if self.config["checkpoint"]:
-            ret.extend(
-                [
+        if self.config["checkpoint_app_domain"]:
+            if len(appliance.get_existing_checkpoints(app_domain)) == appliance.max_checkpoints(app_domain):
+                ret.append(
                     Action(
                         appliance,
                         self.config,
-                        "{}-SaveCheckpoint".format(appliance.hostname),
-                        appliance.SaveCheckpoint,
-                        domain="default",
-                        ChkName="{}_{}".format(
-                            "default",
-                            Timestamp().epoch
-                        ),
-                    ),
-                    Action(
-                        appliance,
-                        self.config,
-                        "{}-SaveCheckpoint".format(appliance.hostname),
-                        appliance.SaveCheckpoint,
+                        "{}-remove-oldest-checkpoint".format(appliance.hostname),
+                        appliance.remove_oldest_checkpoint,
                         domain=app_domain,
-                        ChkName="{}_{}".format(
-                            app_domain,
-                            Timestamp().epoch
-                        )
-                    ),
-                ]
+                    )
+                )
+            ret.append(
+                Action(
+                    appliance,
+                    self.config,
+                    "{}-SaveCheckpoint".format(appliance.hostname),
+                    appliance.SaveCheckpoint,
+                    domain=app_domain,
+                    ChkName="{}_{}".format(
+                        app_domain,
+                        Timestamp().epoch
+                    )
+                )
             )
-        if self.config["backup"]:
-            ret.extend([
+        if self.config["checkpoint_default_domain"]:
+            if len(appliance.get_existing_checkpoints("default")) == appliance.max_checkpoints("default"):
+                ret.append(
+                    Action(
+                        appliance,
+                        self.config,
+                        "{}-remove-oldest-checkpoint".format(appliance.hostname),
+                        appliance.remove_oldest_checkpoint,
+                        domain="default",
+                    )
+                )
+            ret.append(
+                Action(
+                    appliance,
+                    self.config,
+                    "{}-SaveCheckpoint".format(appliance.hostname),
+                    appliance.SaveCheckpoint,
+                    domain="default",
+                    ChkName="{}_{}".format(
+                        "default",
+                        Timestamp().epoch
+                    )
+                )
+            )
+
+        if self.config["backup_app_domain"]:
+            ret.append(
                 Action(
                     appliance,
                     self.config,
                     "{}-NormalBackup".format(appliance.hostname),
                     appliance.get_normal_backup,
-                    domains="default"
-                ),
+                    domains=app_domain,
+                )
+            )
+        if self.config["backup_default_domain"]:
+            ret.append(
                 Action(
                     appliance,
                     self.config,
                     "{}-NormalBackup".format(appliance.hostname),
                     appliance.get_normal_backup,
-                    domains=app_domain
-                ),
-            ])
+                    domains="default",
+                )
+            )
         return ret
 
     def _find_uploads(self):
@@ -651,7 +742,7 @@ class Plan(object):
         if exists(common_password_alias_file):
             with open(common_password_alias_file, "r") as fp:
                 for line in fp:
-                    name, password = line.split(":")
+                    name, password = xordecode(line).split(":")
                     ret.append(
                         {
                             "AliasName": name.strip(),
@@ -661,7 +752,7 @@ class Plan(object):
         if exists(env_password_alias_file):
             with open(env_password_alias_file, "r") as fp:
                 for line in fp:
-                    name, password = line.split(":")
+                    name, password = xordecode(line).split(":")
                     ret.append(
                         {
                             "AliasName": name.strip(),
@@ -686,17 +777,33 @@ class Plan(object):
             self._merged_deployment_policies.append(os.path.relpath(deployment_policy_filename, self.config["repo_dir"]))
             env_tree = etree.parse(deployment_policy_filename)
             self.deployment_policy = env_tree.find(".//ConfigDeploymentPolicy").get("name")
+        else:
+            raise ValueError("Could not find expected DeploymentPolicy directory at '{}'".format(env_deppol_dir))
         if exists(common_deppol_dir):
             if len(filter(lambda x: "EMPTY" not in x, os.listdir(common_deppol_dir))) > 1:
                 raise ValueError("Only one deployment policy permitted In an environmental directory.")
             deployment_policy_filename = filter(lambda x: "EMPTY" not in x, os.listdir(common_deppol_dir))
-            if len(delployment_policy_filename):
+            if len(deployment_policy_filename):
                 deployment_policy_filename = deployment_policy_filename[0]
                 deployment_policy_filename = os.path.join(common_deppol_dir, deployment_policy_filename)
                 self._merged_deployment_policies.append(os.path.relpath(deployment_policy_filename, self.config["repo_dir"]))
                 common_tree = etree.parse(deployment_policy_filename)
-                for node in common_tree.findall(".//ConfigDeploymentPolicy/*"):
-                    env_tree.find(".//ConfigDeploymentPolicy").append(node)
+                deppol = env_tree.find(".//ConfigDeploymentPolicy")
+                # AcceptedConfig
+                i = list(deppol).index(deppol.findall("AcceptedConfig")[-1]) + 1
+                for node in common_tree.findall(".//ConfigDeploymentPolicy/AcceptedConfig"):
+                    deppol.insert(i, node)
+                    i += 1
+                # FilteredConfig
+                i = list(deppol).index(deppol.findall("FilteredConfig")[-1]) + 1
+                for node in common_tree.findall(".//ConfigDeploymentPolicy/FilteredConfig"):
+                    deppol.insert(i, node)
+                    i += 1
+                # ModifiedConfig
+                i = list(deppol).index(deppol.findall("FilteredConfig")[-1]) + 1
+                for node in common_tree.findall(".//ConfigDeploymentPolicy/ModifiedConfig"):
+                    deppol.insert(i, node)
+                    i += 1
         with open(os.path.join(self.config["out_dir"], "merged_deployment_policy.xcfg"), "w") as fp:
             fp.write(etree.tostring(env_tree.getroot()))
 
@@ -720,16 +827,6 @@ class Action(object):
 
     def __call__(self):
         log = make_logger("mast.datapower.deployment.git-deploy")
-        # if "save-config" in self.name:
-        #     filename = os.path.join(self.config["audit_dir"], "{}.xml".format(self.appliance.hostname))
-        #     log.info(
-        #         "auditing configuration changes for '{}', "
-        #         "results can be found in '{}'".format(
-        #             self.appliance.hostname, filename
-        #         )
-        #     )
-        #     with open(filename, "w") as fp:
-        #         fp.write(self.appliance.object_audit())
 
         ret = self.callable()
         req_file = os.path.join(
@@ -748,17 +845,20 @@ class Action(object):
                 self.name,
             )
         )
-        self.req_file = req_file
-        self.resp_file = resp_file
         if "NormalBackup" in self.name:
             resp_file = resp_file.replace(".xml", ".zip")
+        self.req_file = req_file
+        self.resp_file = resp_file
         with open(req_file, "w") as fp:
             fp.write(str(self.appliance.request))
         with open(resp_file, "w") as fp:
-            try:
-                fp.write(self.appliance.last_response)
-            except TypeError:
-                fp.write(str(self.appliance.last_response))
+            if "NormalBackup" in self.name:
+                fp.write(ret)
+            else:
+                try:
+                    fp.write(self.appliance.last_response)
+                except TypeError:
+                    fp.write(str(self.appliance.last_response))
         self.config["step_number"] += 1
         return ret
 
@@ -780,6 +880,19 @@ class Action(object):
         )
 
 def parse_config(appliances, credentials, environment, service):
+    config_filename = os.path.join(os.environ.get("MAST_HOME"), "etc", "local", "service-config.conf")
+    if not os.path.exists(config_filename):
+        raise ValueError("Did not find configuration at '{}'".format(config_filename))
+    with open(config_filename, "r") as fp:
+        headers = list(
+            filter(
+                lambda line: line.startswith("["),
+                fp
+            )
+        )
+    if len(headers) != len(set(headers)):
+        duplicates = [k for k,v in Counter(headers).items() if v>1]
+        raise ValueError("Duplicate header(s) {} found in '{}'".format(duplicates, config_filename))
     config = get_config("service-config.conf")
     ret = {
         "appliances": [],
@@ -867,11 +980,10 @@ def _clone_pull_and_checkout(config):
         with working_directory(config["repo_dir"]):
             out, err = system_call("git pull")
     else:
-        log.info("cloning repo '{}' to '{}'".format(config["repo"].split("/", 1)[0], config["repo_dir"]))
-        out, err = system_call("git clone {} {}".format(config["repo"].split("/", 1)[0], config["repo_dir"]))
+        log.info("cloning repo '{}' to '{}'".format(config["repo"], config["repo_dir"]))
+        out, err = system_call("git clone {} {}".format(config["repo"], config["repo_dir"]))
     log.info("stdout from git: '{}'".format(out))
-    log.info("stderr from git: '{}'".format(err))
-
+    log.info("stderr from git: '{}'".format(err))            
     # If commit is provided, perform a git checkout
     if config["commit"]:
         with working_directory(config["repo_dir"]):
@@ -890,12 +1002,14 @@ def git_deploy(
         commit="",
         out_dir="",
         dry_run=False,
-        force=False,
+        allow_files_in_export=False,
+        ignore_save_needed=False,
         quiesce=True,
-        object_audit=False,
         object_status=True,
-        backup=True,
-        checkpoint=True,
+        backup_app_domain=True,
+        backup_default_domain=True,
+        checkpoint_app_domain=True,
+        checkpoint_default_domain=True,
         quiesce_delay=0,
         quiesce_timeout=60,
         save_config=False,
@@ -906,7 +1020,7 @@ def git_deploy(
     configured in $MAST_HOME/etc/local/service-config.conf, please
     see $MAST_HOME/etc/default/service-config.conf for documentation
     on the format of this configuration file.
-
+				
 Parameters:
 
 * `-a, --appliances`: The hostname(s), ip address(es), environment name(s)
@@ -936,8 +1050,9 @@ off when sending commands to the appliances.
 * `-c, --commit`: The commit id, commit tag or branch for which to perform a git checkout
 * `-o, --out_dir`: The directory in which to store the deployment artifacts
 * `-d, --dry_run`: If specified, nothing will be done to the appliances
-* `-f, --force`: If specified, deployment will proceed regardless of whether
-the app domain needs to be saved and regardless of whether there are local
+* `--ignore-save-needed`: If specified, deployment will proceed regardless of whether
+the app domain needs to be saved 
+* `--allow-files-in-export`: regardless of whether there are local
 uploads within configuration exports
 * `-N, --no-quiesce`: If specified, the service will not be quiesced before the
 deployment
@@ -953,25 +1068,30 @@ saved after the deployment is complete
     config = parse_config(appliances, credentials, environment, service)
     config.update(
         {
-            "force": force,
+            "allow_files_in_export": allow_files_in_export,
+            "ignore_save_needed": ignore_save_needed,
             "quiesce": quiesce,
             "quiesce_delay": quiesce_delay,
             "quiesce_timeout": quiesce_timeout,
             "save_config": save_config,
             "step_number": 0,
-            "object_audit": object_audit,
             "object_status": object_status,
-            "backup": backup,
+            "backup_app_domain": backup_app_domain,
+            "backup_default_domain": backup_default_domain,
+            "checkpoint_app_domain": checkpoint_app_domain,
+            "checkpoint_default_domain": checkpoint_default_domain,
             "commit": commit,
             "service": service,
+            "timeout": timeout,
             "web": web,
-            "checkpoint": checkpoint,
         }
     )
     # This adds paths to config and creates the directories as needed
     _prepare_output_directories(config, out_dir)
 
     _initialize_logging(config)
+
+    log.info("Working with path: '{}'".format(os.environ.get("PATH")))
 
     _clone_pull_and_checkout(config)
 
@@ -999,3 +1119,4 @@ if __name__ == "__main__":
     except:
         make_logger("mast.datapower.deployment.git-deploy").exception("An unhandled exception occurred")
         raise
+

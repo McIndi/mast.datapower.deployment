@@ -944,7 +944,7 @@ def _prepare_output_directories(config, out_dir):
     config["audit_dir"] = os.path.join(out_dir, "audit")
     config["repo_dir"] = os.path.join(out_dir, config["service"])
     if "subdirectory" in config:
-        config["repo_dir"] = os.path.join(config["repo_dir"], service, config["subdirectory"])
+        config["repo_dir"] = os.path.join(config["repo_dir"], config["subdirectory"])
 
     # Create the out and audit directories if needed
     if not os.path.exists(config["out_dir"]):

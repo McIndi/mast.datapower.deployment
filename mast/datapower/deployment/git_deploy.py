@@ -143,10 +143,12 @@ def wait_for_unquiesce(appliance, app_domain, services, timeout):
 
 
 class Plan(object):
-    """A class representing a plan of action for the deployment.
+    """A class representing a plan of action for the deployment.                                                                                                                                                                                            	
     """
     def __init__(self, config, environment):
         self.config = config
+        if "subdirectory" in self.config:
+            self.config["repo_dir"] = os.path.join(self.config["repo_dir"], self.config["subdirectory"])
         self.environment = environment
         self.service = config["service"]
         self.deployment_policy = None
@@ -943,8 +945,6 @@ def _prepare_output_directories(config, out_dir):
     config["out_dir"] = out_dir
     config["audit_dir"] = os.path.join(out_dir, "audit")
     config["repo_dir"] = os.path.join(out_dir, config["service"])
-    if "subdirectory" in config:
-        config["repo_dir"] = os.path.join(config["repo_dir"], config["subdirectory"])
 
     # Create the out and audit directories if needed
     if not os.path.exists(config["out_dir"]):

@@ -236,7 +236,6 @@ class Plan(object):
                 # Not an XML response, it is a normal backup
                 pass
 
-            log.info(str(response))
             if self.config["web"]:
                 key = "{}-{}".format(index, action.name)
                 # web mode
@@ -829,7 +828,6 @@ class Action(object):
 
     def __call__(self):
         log = make_logger("mast.datapower.deployment.git-deploy")
-
         ret = self.callable()
         req_file = os.path.join(
             self.config["out_dir"],

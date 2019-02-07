@@ -820,17 +820,25 @@ class Plan(object):
                     common_tree = etree.parse(deployment_policy_filename)
                     deppol = env_tree.find(".//ConfigDeploymentPolicy")
                     # AcceptedConfig
-                    i = list(deppol).index(deppol.findall("AcceptedConfig")[-1]) + 1
+                    i = list(deppol).index(deppol.findall("AcceptedConfig"))
+                    if not i:
+                        i = 0
+                    else:
+                        i = i[-1] + 1
                     for node in common_tree.findall(".//ConfigDeploymentPolicy/AcceptedConfig"):
                         deppol.insert(i, node)
                         i += 1
                     # FilteredConfig
-                    i = list(deppol).index(deppol.findall("FilteredConfig")[-1]) + 1
+                    _i = list(deppol).index(deppol.findall("FilteredConfig"))
+                    if _i:
+                       i = _i[-1] + 1
                     for node in common_tree.findall(".//ConfigDeploymentPolicy/FilteredConfig"):
                         deppol.insert(i, node)
                         i += 1
                     # ModifiedConfig
-                    i = list(deppol).index(deppol.findall("FilteredConfig")[-1]) + 1
+                    _i = list(deppol).index(deppol.findall("FilteredConfig"))
+                    if _i:
+                       i = _i[-1] + 1                    
                     for node in common_tree.findall(".//ConfigDeploymentPolicy/ModifiedConfig"):
                         deppol.insert(i, node)
                         i += 1

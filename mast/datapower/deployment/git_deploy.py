@@ -145,11 +145,11 @@ def wait_for_unquiesce(appliance, app_domain, services, timeout):
 class Plan(object):
     """A class representing a plan of action for the deployment.                                                                                                                                                                                            	
     """
-    def __init__(self, config, environment):
+    def __init__(self, config):
         self.config = config
         if "subdirectory" in self.config:
             self.config["repo_dir"] = os.path.join(self.config["repo_dir"], self.config["subdirectory"])
-        self.environment = environment
+        self.environment = config["_environment"]
         self.service = config["service"]
         self.deployment_policy = None
 
@@ -189,6 +189,9 @@ class Plan(object):
             output["Services"] = ""
             for kwargs in self._services:
                 output["Services"] += "{}: {}\n".format(kwargs["type"], kwargs["name"])
+            output["Directories to Create"] = ""
+            for directory in self.dirs_to_create:
+                output["Directories to Create"] = "{}{}".format(directory, os.linesep)
             output["Uploads"] = ""
             for filename, kwargs in self._uploads.items():
                 output["Uploads"] += "{} -> {}{}".format(os.path.relpath(kwargs["file_in"], self.config["repo_dir"]), kwargs["file_out"], os.linesep)
@@ -211,6 +214,9 @@ class Plan(object):
             for kwargs in self._services:
                 print("\t{}: {}".format(kwargs["type"], kwargs["name"]))
             print("-"*80)
+            print("Directories to Create")
+            for directory in self.dirs_to_create:
+                print(directory)
             print("Uploads")
             for filename, kwargs in self._uploads.items():
                 print("\t{} -> {}".format(os.path.relpath(kwargs["file_in"], self.config["repo_dir"]), kwargs["file_out"]))
@@ -454,18 +460,18 @@ class Plan(object):
                         **kwargs
                     )
                 )
-
-            ret.append(
-                Action(
-                    appliance,
-                    self.config,
-                    "{}-import-deployment-policy".format(appliance.hostname),
-                    appliance.do_import,
-                    domain=app_domain,
-                    zip_file=os.path.join(self.config["out_dir"], "merged_deployment_policy.xcfg"),
-                    source_type="XML",
+            if self.deployment_policy is not None:
+                ret.append(
+                    Action(
+                        appliance,
+                        self.config,
+                        "{}-import-deployment-policy".format(appliance.hostname),
+                        appliance.do_import,
+                        domain=app_domain,
+                        zip_file=os.path.join(self.config["out_dir"], "merged_deployment_policy.xcfg"),
+                        source_type="XML",
+                    )
                 )
-            )
             for kwargs in self._imports:
                 if env_config_dir in kwargs["zip_file"]:
                     # Do not apply deployment policy to env-specific imports
@@ -480,17 +486,30 @@ class Plan(object):
                         )
                     )
                 else:
-                    ret.append(
-                        Action(
-                            appliance,
-                            self.config,
-                            "{}-import".format(appliance.hostname),
-                            appliance.do_import,
-                            domain=app_domain,
-                            deployment_policy=self.deployment_policy,
-                            **kwargs
+                    if self.deployment_policy is not None:
+                        ret.append(
+                            Action(
+                                appliance,
+                                self.config,
+                                "{}-import".format(appliance.hostname),
+                                appliance.do_import,
+                                domain=app_domain,
+                                deployment_policy=self.deployment_policy,
+                                **kwargs
+                            )
                         )
-                    )
+                    else:
+                        ret.append(
+                            Action(
+                                appliance,
+                                self.config,
+                                "{}-import".format(appliance.hostname),
+                                appliance.do_import,
+                                domain=app_domain,
+                                deployment_policy=self.deployment_policy,
+                                **kwargs
+                            )
+                        )
 
             if self.config["quiesce"]:
                 for kwargs in services_to_quiesce:
@@ -769,44 +788,68 @@ class Plan(object):
         env_deppol_dir = os.path.join(env_dir, "DeploymentPolicy")
         common_deppol_dir = os.path.join(project_root, "DeploymentPolicy")
         self._merged_deployment_policies = []
+        env_tree = None
         # Get deployment policy
         if exists(env_deppol_dir):
             if len(filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))) > 1:
                 raise ValueError("Only one deployment policy permitted In an environmental directory.")
-            deployment_policy_filename = filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))[0]
-            deployment_policy_filename = os.path.join(env_deppol_dir, deployment_policy_filename)
-            self._merged_deployment_policies.append(os.path.relpath(deployment_policy_filename, self.config["repo_dir"]))
-            env_tree = etree.parse(deployment_policy_filename)
-            self.deployment_policy = env_tree.find(".//ConfigDeploymentPolicy").get("name")
-        else:
-            raise ValueError("Could not find expected DeploymentPolicy directory at '{}'".format(env_deppol_dir))
-        if exists(common_deppol_dir):
-            if len(filter(lambda x: "EMPTY" not in x, os.listdir(common_deppol_dir))) > 1:
-                raise ValueError("Only one deployment policy permitted In an environmental directory.")
-            deployment_policy_filename = filter(lambda x: "EMPTY" not in x, os.listdir(common_deppol_dir))
-            if len(deployment_policy_filename):
-                deployment_policy_filename = deployment_policy_filename[0]
-                deployment_policy_filename = os.path.join(common_deppol_dir, deployment_policy_filename)
+            try:
+                deployment_policy_filename = filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))[0]
+            except IndexError:
+                if not self.config["ignore_no_deployment_policy"]:
+                    raise ValueError("Could not find expected DeploymentPolicy directory at '{}'".format(env_deppol_dir))
+                else:
+                    deployment_policy_filename = None
+            if deployment_policy_filename is not None:
+                deployment_policy_filename = os.path.join(env_deppol_dir, deployment_policy_filename)
                 self._merged_deployment_policies.append(os.path.relpath(deployment_policy_filename, self.config["repo_dir"]))
-                common_tree = etree.parse(deployment_policy_filename)
-                deppol = env_tree.find(".//ConfigDeploymentPolicy")
-                # AcceptedConfig
-                i = list(deppol).index(deppol.findall("AcceptedConfig")[-1]) + 1
-                for node in common_tree.findall(".//ConfigDeploymentPolicy/AcceptedConfig"):
-                    deppol.insert(i, node)
-                    i += 1
-                # FilteredConfig
-                i = list(deppol).index(deppol.findall("FilteredConfig")[-1]) + 1
-                for node in common_tree.findall(".//ConfigDeploymentPolicy/FilteredConfig"):
-                    deppol.insert(i, node)
-                    i += 1
-                # ModifiedConfig
-                i = list(deppol).index(deppol.findall("FilteredConfig")[-1]) + 1
-                for node in common_tree.findall(".//ConfigDeploymentPolicy/ModifiedConfig"):
-                    deppol.insert(i, node)
-                    i += 1
-        with open(os.path.join(self.config["out_dir"], "merged_deployment_policy.xcfg"), "w") as fp:
-            fp.write(etree.tostring(env_tree.getroot()))
+                env_tree = etree.parse(deployment_policy_filename)
+                self.deployment_policy = env_tree.find(".//ConfigDeploymentPolicy").get("name")
+        else:
+            if not self.config["ignore_no_deployment_policy"]:
+                raise ValueError("Could not find expected DeploymentPolicy directory at '{}'".format(env_deppol_dir))
+        if exists(common_deppol_dir):
+            if self.deployment_policy is not None:
+                if len(filter(lambda x: "EMPTY" not in x, os.listdir(common_deppol_dir))) > 1:
+                    raise ValueError("Only one deployment policy permitted In an environmental directory.")
+                deployment_policy_filename = filter(lambda x: "EMPTY" not in x, os.listdir(common_deppol_dir))
+                if len(deployment_policy_filename):
+                    deployment_policy_filename = deployment_policy_filename[0]
+                    deployment_policy_filename = os.path.join(common_deppol_dir, deployment_policy_filename)
+                    self._merged_deployment_policies.append(os.path.relpath(deployment_policy_filename, self.config["repo_dir"]))
+                    common_tree = etree.parse(deployment_policy_filename)
+                    deppol = env_tree.find(".//ConfigDeploymentPolicy")
+                    # AcceptedConfig
+                    i = list(deppol).index(deppol.findall("AcceptedConfig")[-1]) + 1
+                    for node in common_tree.findall(".//ConfigDeploymentPolicy/AcceptedConfig"):
+                        deppol.insert(i, node)
+                        i += 1
+                    # FilteredConfig
+                    i = list(deppol).index(deppol.findall("FilteredConfig")[-1]) + 1
+                    for node in common_tree.findall(".//ConfigDeploymentPolicy/FilteredConfig"):
+                        deppol.insert(i, node)
+                        i += 1
+                    # ModifiedConfig
+                    i = list(deppol).index(deppol.findall("FilteredConfig")[-1]) + 1
+                    for node in common_tree.findall(".//ConfigDeploymentPolicy/ModifiedConfig"):
+                        deppol.insert(i, node)
+                        i += 1
+            else:
+                try:
+                    deployment_policy_filename = filter(lambda x: "EMPTY" not in x, os.listdir(common_deppol_dir))[0]
+                except IndexError:
+                    if not self.config["ignore_no_deployment_policy"]:
+                        raise ValueError("Could not find expected DeploymentPolicy directory at '{}'".format(common_deppol_dir))
+                    else:
+                        pass
+                if deployment_policy_filename:
+                    deployment_policy_filename = os.path.join(common_deppol_dir, deployment_policy_filename)
+                    self._merged_deployment_policies.append(os.path.relpath(deployment_policy_filename, self.config["repo_dir"]))
+                    env_tree = etree.parse(deployment_policy_filename)
+                    self.deployment_policy = env_tree.find(".//ConfigDeploymentPolicy").get("name")
+        if env_tree is not None:
+            with open(os.path.join(self.config["out_dir"], "merged_deployment_policy.xcfg"), "w") as fp:
+                fp.write(etree.tostring(env_tree.getroot()))
 
 class Action(object):
     """A class representing a action to be taken as
@@ -879,7 +922,7 @@ class Action(object):
             )
         )
 
-def parse_config(appliances, credentials, environment, service):
+def parse_config(appliances, credentials, environment, service, check_hostname, timeout):
     config_filename = os.path.join(os.environ.get("MAST_HOME"), "etc", "local", "service-config.conf")
     if not os.path.exists(config_filename):
         raise ValueError("Did not find configuration at '{}'".format(config_filename))
@@ -900,17 +943,24 @@ def parse_config(appliances, credentials, environment, service):
         "domains": [],
         "environment": environment,
     }
-    for index, appliance in enumerate(appliances):
+    _environment = datapower.Environment(
+        appliances,
+        credentials=credentials,
+        check_hostname=check_hostname,
+        timeout=timeout,
+    )
+    ret["_environment"] = _environment
+    for index, appliance in enumerate(_environment.appliances):
         domain = config.get(
             service,
-            "{}-{}".format(appliance, environment),
+            "{}-{}".format(appliance.hostname, environment),
             None
         )
         if domain is None:
             raise ValueError("Appliance '{}' not part of environment '{}'".format(
-                appliance, environment
+                appliance.hostname, environment
             ))
-        ret["appliances"].append(appliance)
+        ret["appliances"].append(appliance.hostname)
         if len(credentials) == 1:
             ret["credentials"].append(credentials[0])
         else:
@@ -1002,6 +1052,7 @@ def git_deploy(
         dry_run=False,
         allow_files_in_export=False,
         ignore_save_needed=False,
+        ignore_no_deployment_policy=False,
         quiesce=True,
         object_status=True,
         backup_app_domain=True,
@@ -1050,10 +1101,17 @@ off when sending commands to the appliances.
 * `-d, --dry_run`: If specified, nothing will be done to the appliances
 * `--ignore-save-needed`: If specified, deployment will proceed regardless of whether
 the app domain needs to be saved 
+* `--ignore-no-deployment-policy`: If specified, deployment will proceed even if
+there are no deployment policies
 * `--allow-files-in-export`: regardless of whether there are local
 uploads within configuration exports
 * `-N, --no-quiesce`: If specified, the service will not be quiesced before the
 deployment
+* `--no-object-status`: If specified, no object status will be taken
+* `--no-backup-app-domain`: If specified, the app domain will not be backed up
+* `--no-backup-default-domain`: If specified, the default domain will not be backed up
+* `--no-checkpoint-app-domain`: If specified, no checkpoint will be set in the app domain
+* `--no-checkpoint-default-domain`: If specified, no checkpoint will be set in the default domain
 * `-q, --quiesce-delay`: The number of seconds the datapower will wait
 before quiescing the service
 * `-Q, --quiesce-timeout`: The maximum number of seconds for the datapower to
@@ -1063,11 +1121,13 @@ saved after the deployment is complete
     """
     log = make_logger("mast.datapower.deployment.git-deploy")
 
-    config = parse_config(appliances, credentials, environment, service)
+    check_hostname = not no_check_hostname
+    config = parse_config(appliances, credentials, environment, service, check_hostname, timeout)
     config.update(
         {
             "allow_files_in_export": allow_files_in_export,
             "ignore_save_needed": ignore_save_needed,
+            "ignore_no_deployment_policy": ignore_no_deployment_policy,
             "quiesce": quiesce,
             "quiesce_delay": quiesce_delay,
             "quiesce_timeout": quiesce_timeout,
@@ -1093,14 +1153,7 @@ saved after the deployment is complete
 
     _clone_pull_and_checkout(config)
 
-    environment = datapower.Environment(
-        config["appliances"],
-        credentials=config["credentials"],
-        check_hostname=not no_check_hostname,
-        timeout=timeout,
-    )
-
-    plan = Plan(config, environment)
+    plan = Plan(config)
 
     if dry_run:
         return plan.list_steps()

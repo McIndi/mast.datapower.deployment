@@ -765,11 +765,12 @@ class Plan(object):
                 for line in fp:
                     try:
                         name, password = xordecode(line).split(":")
-                    except binascii.Error:
+                    except (binascii.Error, ValueError):
                         try:
                             name, password = line.split(":")
                         except:
                             raise ValueError("Unable to parse Password Map Alias")
+                        
                     ret.append(
                         {
                             "AliasName": name.strip(),
@@ -781,7 +782,7 @@ class Plan(object):
                 for line in fp:
                     try:
                         name, password = xordecode(line).split(":")
-                    except binascii.Error:
+                    except (binascii.Error, ValueError):
                         try:
                             name, password = line.split(":")
                         except:

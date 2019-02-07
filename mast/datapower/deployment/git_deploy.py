@@ -359,6 +359,7 @@ class Plan(object):
         env_config_dir = os.path.join(env_dir, "config")
 
         ret = []
+        self.dirs_to_create = defaultdict(list)
         for appliance in self.environment.appliances:
             app_domain = self.config["domains"][self.config["appliances"].index(appliance.hostname)]
 
@@ -430,7 +431,6 @@ class Plan(object):
                     )
                 )
             filestore = appliance.get_filestore(app_domain)
-            self.dirs_to_create = defaultdict(list)
             for filename, kwargs in self._uploads.items():
                 file_out = kwargs["file_out"]
                 if file_out.startswith("local"):

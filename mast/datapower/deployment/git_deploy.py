@@ -14,6 +14,7 @@ from functools import partial
 from collections import OrderedDict, defaultdict
 import xml.etree.cElementTree as etree
 from os.path import exists
+import binascii
 import logging
 import subprocess
 import shutil

@@ -194,7 +194,7 @@ class Plan(object):
             for hostname, dirs in self.dirs_to_create:
                 if dirs:
                     output["Directories to Create"] = "{}{}".format(hostname, os.linesep)
-                    for directory in dirs"
+                    for directory in dirs:
                         output["Directories to Create"] = "\t{}{}".format(directory, os.linesep)
             output["Uploads"] = ""
             for filename, kwargs in self._uploads.items():

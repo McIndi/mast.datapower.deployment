@@ -191,8 +191,11 @@ class Plan(object):
             for kwargs in self._services:
                 output["Services"] += "{}: {}\n".format(kwargs["type"], kwargs["name"])
             output["Directories to Create"] = ""
-            for directory in self.dirs_to_create:
-                output["Directories to Create"] = "{}{}".format(directory, os.linesep)
+            for hostname, dirs in self.dirs_to_create:
+                if dirs:
+                    output["Directories to Create"] = "{}{}".format(hostname, os.linesep)
+                    for directory in dirs"
+                        output["Directories to Create"] = "\t{}{}".format(directory, os.linesep)
             output["Uploads"] = ""
             for filename, kwargs in self._uploads.items():
                 output["Uploads"] += "{} -> {}{}".format(os.path.relpath(kwargs["file_in"], self.config["repo_dir"]), kwargs["file_out"], os.linesep)
@@ -216,8 +219,11 @@ class Plan(object):
                 print("\t{}: {}".format(kwargs["type"], kwargs["name"]))
             print("-"*80)
             print("Directories to Create")
-            for directory in self.dirs_to_create:
-                print(directory)
+            for hostname, dirs in self.dirs_to_create.items():
+                if dirs:
+                    print("\t{}".format(hostname))
+                    for directory in dirs:
+                        print("\t\t{}".format(directory))
             print("Uploads")
             for filename, kwargs in self._uploads.items():
                 print("\t{} -> {}".format(os.path.relpath(kwargs["file_in"], self.config["repo_dir"]), kwargs["file_out"]))

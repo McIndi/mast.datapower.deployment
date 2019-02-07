@@ -435,7 +435,7 @@ class Plan(object):
                 file_out = kwargs["file_out"]
                 if file_out.startswith("local"):
                     target_dir = "/".join(file_out.split("/")[:-1])
-                    if not appliance.directory_exists(target_dir, app_domain, filestore) and target_dir not in self.dirs_to_create:
+                    if not appliance.directory_exists(target_dir, app_domain, filestore) and target_dir not in self.dirs_to_create[appliance.hostname]:
                         self.dirs_to_create[appliance.hostname].append(target_dir)
                         ret.append(
                             Action(

@@ -1057,7 +1057,18 @@ def _clone_pull_and_checkout(config):
         with working_directory(config["repo_dir"]):
             out, err = system_call("git pull")
     else:
-        log.info("cloning repo '{}' to '{}'".format(config["repo"], config["repo_dir"]))
+        _repo = config["repo"]
+        if "git-credentials" in config:
+            _remove_this = ":".join(
+                map(
+                    quote_plus, 
+                    xordecode(
+                        config["git-credentials"]
+                    ).split(":")
+                )
+            ) + "@"
+            _repo = config["repo"].replace(_remove_this, "")
+        log.info("cloning repo '{}' to '{}'".format(_repo, config["repo_dir"]))
         out, err = system_call("git clone {} {}".format(config["repo"], config["repo_dir"]))
     log.info("stdout from git: '{}'".format(out))
     log.info("stderr from git: '{}'".format(err))            

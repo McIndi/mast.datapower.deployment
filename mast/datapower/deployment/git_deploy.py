@@ -762,7 +762,13 @@ class Plan(object):
         if exists(common_password_alias_file):
             with open(common_password_alias_file, "r") as fp:
                 for line in fp:
-                    name, password = xordecode(line).split(":")
+                    try:
+                        name, password = xordecode(line).split(":")
+                    except binascii.Error:
+                        try:
+                            name, password = line.split(":")
+                        except:
+                            raise ValueError("Unable to parse Password Map Alias")
                     ret.append(
                         {
                             "AliasName": name.strip(),
@@ -772,7 +778,13 @@ class Plan(object):
         if exists(env_password_alias_file):
             with open(env_password_alias_file, "r") as fp:
                 for line in fp:
-                    name, password = xordecode(line).split(":")
+                    try:
+                        name, password = xordecode(line).split(":")
+                    except binascii.Error:
+                        try:
+                            name, password = line.split(":")
+                        except:
+                            raise ValueError("Unable to parse Password Map Alias")
                     ret.append(
                         {
                             "AliasName": name.strip(),

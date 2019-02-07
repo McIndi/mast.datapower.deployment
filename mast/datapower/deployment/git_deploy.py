@@ -240,7 +240,8 @@ class Plan(object):
         for index, action in enumerate(self):
             print("\nStep {}, {}".format(index, action.name))
             for k, v in action.kwargs.items():
-                print("\t{}={}".format(k, v))
+                if "password" not in k.lower():
+                    print("\t{}={}".format(k, v))
             log.info("Executing action '{}'".format(repr(action)))
             response = action()
             try:

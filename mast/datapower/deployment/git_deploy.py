@@ -191,7 +191,7 @@ class Plan(object):
             for kwargs in self._services:
                 output["Services"] += "{}: {}\n".format(kwargs["type"], kwargs["name"])
             output["Directories to Create"] = ""
-            for hostname, dirs in self.dirs_to_create:
+            for hostname, dirs in self.dirs_to_create.items():
                 if dirs:
                     output["Directories to Create"] = "{}{}".format(hostname, os.linesep)
                     for directory in dirs:

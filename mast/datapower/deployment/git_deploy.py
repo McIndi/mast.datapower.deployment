@@ -1,3 +1,4 @@
+from __future__ import print_function
 from mast.datapower import datapower
 from mast.plugin_utils.plugin_utils import render_history, render_results_table
 from collections import Counter
@@ -19,8 +20,27 @@ import logging
 import subprocess
 import shutil
 import os
+import sys
 import contextlib
 
+BUFFER = []
+def print(s):
+    log = make_logger("mast.datapower.deployment.results")
+    global BUFFER
+    BUFFER.append(s)
+    wrote = True
+    for _s in BUFFER:
+        try:
+            sys.stdout.write("{}{}".format(_s.rstrip(), os.linesep))
+            sys.stdout.flush()
+        except IOError:
+            wrote = False
+            break
+        else:
+            wrote = True
+        log.info(_s)
+    if wrote is True:
+        BUFFER = []
 
 @contextlib.contextmanager
 def working_directory(path):
@@ -812,10 +832,10 @@ class Plan(object):
         env_tree = None
         # Get deployment policy
         if exists(env_deppol_dir):
-            if len(filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))) > 1:
+            if len(filter(lambda x: x.endswith(".xcfg"), os.listdir(env_deppol_dir))) > 1:
                 raise ValueError("Only one deployment policy permitted In an environmental directory.")
             try:
-                deployment_policy_filename = filter(lambda x: "EMPTY" not in x, os.listdir(env_deppol_dir))[0]
+                deployment_policy_filename = filter(lambda x: x.endswith(".xcfg"), os.listdir(env_deppol_dir))[0]
             except IndexError:
                 if not self.config["ignore_no_deployment_policy"]:
                     raise ValueError("Could not find expected DeploymentPolicy directory at '{}'".format(env_deppol_dir))
@@ -831,9 +851,9 @@ class Plan(object):
                 raise ValueError("Could not find expected DeploymentPolicy directory at '{}'".format(env_deppol_dir))
         if exists(common_deppol_dir):
             if self.deployment_policy is not None:
-                if len(filter(lambda x: "EMPTY" not in x, os.listdir(common_deppol_dir))) > 1:
+                if len(filter(lambda x: x.endswith(".xcfg"), os.listdir(common_deppol_dir))) > 1:
                     raise ValueError("Only one deployment policy permitted In an environmental directory.")
-                deployment_policy_filename = filter(lambda x: "EMPTY" not in x, os.listdir(common_deppol_dir))
+                deployment_policy_filename = filter(lambda x: x.endswith(".xcfg"), os.listdir(common_deppol_dir))
                 if len(deployment_policy_filename):
                     deployment_policy_filename = deployment_policy_filename[0]
                     deployment_policy_filename = os.path.join(common_deppol_dir, deployment_policy_filename)
@@ -865,7 +885,7 @@ class Plan(object):
                         i += 1
             else:
                 try:
-                    deployment_policy_filename = filter(lambda x: "EMPTY" not in x, os.listdir(common_deppol_dir))[0]
+                    deployment_policy_filename = filter(lambda x: x.endswith(".xcfg"), os.listdir(common_deppol_dir))[0]
                 except IndexError:
                     if not self.config["ignore_no_deployment_policy"]:
                         raise ValueError("Could not find expected DeploymentPolicy directory at '{}'".format(common_deppol_dir))
@@ -1047,6 +1067,19 @@ def _initialize_logging(config):
     formatter = logging.Formatter("%(asctime)s: %(levelname)s: %(relativeCreated)d: %(message)s")
     handler.setFormatter(formatter)
     log.addHandler(handler)
+    
+    log_2 = make_logger("mast.datapower.deployment.results")
+    handler_2 = logging.FileHandler(
+        os.path.join(
+            config["out_dir"],
+            "results.log"
+        ),
+        "w"
+    )
+    formatter_2 = logging.Formatter("%(message)s")
+    handler_2.setFormatter(formatter_2)
+    log_2.addHandler(handler_2)
+    
 
 def _clone_pull_and_checkout(config):
     """Either pull latest changes or clone the remote repository

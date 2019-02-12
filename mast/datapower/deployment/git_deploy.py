@@ -22,25 +22,84 @@ import shutil
 import os
 import sys
 import contextlib
+import sys
+from multiprocessing import Process
+from multiprocessing.queues import Queue
+from threading import Thread
+from Tkinter import *
+from ScrolledText import ScrolledText
 
-BUFFER = []
-def print(s):
+def print(msg):
     log = make_logger("mast.datapower.deployment.results")
-    global BUFFER
-    BUFFER.append(s)
-    wrote = True
-    for _s in BUFFER:
-        try:
-            sys.stdout.write("{}{}".format(_s.rstrip(), os.linesep))
-            sys.stdout.flush()
-        except IOError:
-            wrote = False
+    log.info(msg)
+    sys.stdout.write("{}{}".format(msg.rstrip(), os.linesep))
+    sys.stdout.flush()
+
+
+class StdoutDisplay(Process):
+    def __init__(self, q, *args, **kwargs):
+        Process.__init__(self, *args, **kwargs)
+        self.q = q
+    
+    def close(self):
+#        self.q.put("END")
+        self.gui_root.quit()
+        
+    def run(self):
+        self.gui_root = Tk()
+        self.gui_root.title("MAST Git-Deployment Output")
+        self.gui_txt = ScrolledText(self.gui_root)
+        self.gui_txt.pack(fill="both", expand=True)
+        # self.gui_btn = Button(self.gui_root, text='Close', command=self.close)
+        # self.gui_btn.pack()
+
+        # Instantiate and start the text monitor
+        self.monitor = Thread(target=text_catcher,args=(self, self.gui_txt, self.q))
+        self.monitor.daemon = True
+        self.monitor.start()
+
+        self.gui_root.mainloop()
+
+# This function takes the text widget and a queue as inputs.
+# It functions by waiting on new data entering the queue, when it 
+# finds new data it will insert it into the text widget 
+def text_catcher(parent, text_widget,queue):
+    while True:
+        msg = queue.get()
+        text_widget.insert(END, msg)
+        text_widget.see("end")
+        if msg.strip() == "END":
             break
-        else:
-            wrote = True
-        log.info(_s)
-    if wrote is True:
-        BUFFER = []
+    parent.close()
+
+# This is a Queue that behaves like stdout
+class StdoutQueue(Queue):
+    def __init__(self,*args,**kwargs):
+        Queue.__init__(self,*args,**kwargs)
+
+    def write(self,msg):
+        self.put(msg)
+
+    def flush(self):
+        sys.__stdout__.flush()
+#BUFFER = []
+#def print(s):
+#    log = make_logger("mast.datapower.deployment.results")
+#    global BUFFER
+#    BUFFER.append(s)
+#    wrote = True
+#    for _s in BUFFER:
+#        try:
+#            sys.stdout.write("{}{}".format(_s.rstrip(), os.linesep))
+#            sys.stdout.flush()
+#        except IOError:
+#            wrote = False
+#            break
+#        else:
+#            wrote = True
+#        log.info(_s)
+#    if wrote is True:
+#        BUFFER = []
 
 @contextlib.contextmanager
 def working_directory(path):
@@ -1224,15 +1283,25 @@ saved after the deployment is complete
 
     log.info("Working with path: '{}'".format(os.environ.get("PATH")))
 
+    if web:
+        q = StdoutQueue()
+        sys.stdout = q
+        display = StdoutDisplay(q)
+        display.start()
+        sleep(2)
+
     _clone_pull_and_checkout(config)
 
     plan = Plan(config)
 
     if dry_run:
-        return plan.list_steps()
+        ret = plan.list_steps()
     else:
-        return plan.execute()
-
+        ret = plan.execute()
+    if web:
+        sleep(5)
+        display.q.put("END")
+    return ret
 
 if __name__ == "__main__":
     cli = Cli(main=main, description=main.__doc__)

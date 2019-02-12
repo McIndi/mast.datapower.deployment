@@ -31,9 +31,10 @@ from ScrolledText import ScrolledText
 
 def print(msg):
     log = make_logger("mast.datapower.deployment.results")
-    log.info(msg)
-    sys.stdout.write("{}{}".format(msg.rstrip(), os.linesep))
-    sys.stdout.flush()
+    if msg is not None:
+        log.info(msg)
+        sys.stdout.write("{}{}".format(msg.rstrip(), os.linesep))
+        sys.stdout.flush()
 
 
 class StdoutDisplay(Process):
@@ -284,35 +285,34 @@ class Plan(object):
             output["Password Map Aliases"] = ""
             for kwargs in self._password_map_aliases:
                 output["Password Map Aliases"] += "{}{}".format(kwargs["AliasName"], os.linesep)
-            return render_results_table(output), render_history(self.environment)
-        else:
-            print("App Domains")
-            for appliance in self.environment.appliances:
-                app_domain = self.config["domains"][self.config["appliances"].index(appliance.hostname)]
-                print("\t{} -> {}".format(appliance.hostname, app_domain))
-            print("Merged DeploymentPolicies")
-            for filename in self._merged_deployment_policies:
-                print("\t{}".format(filename))
-            print("Services")
-            for kwargs in self._services:
-                print("\t{}: {}".format(kwargs["type"], kwargs["name"]))
-            print("-"*80)
-            print("Directories to Create")
-            for hostname, dirs in self.dirs_to_create.items():
-                if dirs:
-                    print("\t{}".format(hostname))
-                    for directory in dirs:
-                        print("\t\t{}".format(directory))
-            print("Uploads")
-            for filename, kwargs in self._uploads.items():
-                print("\t{} -> {}".format(os.path.relpath(kwargs["file_in"], self.config["repo_dir"]), kwargs["file_out"]))
-            print("Imports")
-            for kwargs in self._imports:
-                print("\t{}".format(os.path.relpath(kwargs["zip_file"], self.config["repo_dir"])))
-            print("Password Map Aliases")
-            for kwargs in self._password_map_aliases:
-                print("\t{}".format(kwargs["AliasName"]))
-
+            ret = render_results_table(output), render_history(self.environment)
+        print("App Domains")
+        for appliance in self.environment.appliances:
+            app_domain = self.config["domains"][self.config["appliances"].index(appliance.hostname)]
+            print("\t{} -> {}".format(appliance.hostname, app_domain))
+        print("Merged DeploymentPolicies")
+        for filename in self._merged_deployment_policies:
+            print("\t{}".format(filename))
+        print("Services")
+        for kwargs in self._services:
+            print("\t{}: {}".format(kwargs["type"], kwargs["name"]))
+        print("-"*80)
+        print("Directories to Create")
+        for hostname, dirs in self.dirs_to_create.items():
+            if dirs:
+                print("\t{}".format(hostname))
+                for directory in dirs:
+                    print("\t\t{}".format(directory))
+        print("Uploads")
+        for filename, kwargs in self._uploads.items():
+            print("\t{} -> {}".format(os.path.relpath(kwargs["file_in"], self.config["repo_dir"]), kwargs["file_out"]))
+        print("Imports")
+        for kwargs in self._imports:
+            print("\t{}".format(os.path.relpath(kwargs["zip_file"], self.config["repo_dir"])))
+        print("Password Map Aliases")
+        for kwargs in self._password_map_aliases:
+            print("\t{}".format(kwargs["AliasName"]))
+        return ret
     def execute(self):
         log = make_logger("mast.datapower.deployment.git-deploy")
         output = OrderedDict()
@@ -1162,6 +1162,8 @@ def _clone_pull_and_checkout(config):
             _repo = config["repo"].replace(_remove_this, "")
         log.info("cloning repo '{}' to '{}'".format(_repo, config["repo_dir"]))
         out, err = system_call("git clone {} {}".format(config["repo"], config["repo_dir"]))
+    print(out)
+    print(err)
     log.info("stdout from git: '{}'".format(out))
     log.info("stderr from git: '{}'".format(err))            
     # If commit is provided, perform a git checkout
@@ -1169,6 +1171,8 @@ def _clone_pull_and_checkout(config):
         with working_directory(config["repo_dir"]):
             log.info("performing 'git checkout {}'".format(config["commit"]))
             out, err = system_call("git checkout {}".format(config["commit"]))
+        print(out)
+        print(err)
         log.info("stdout from git checkout: '{}'".format(out))
         log.info("stderr from git checkout: '{}'".format(err))
 
@@ -1286,10 +1290,11 @@ saved after the deployment is complete
     if web:
         q = StdoutQueue()
         sys.stdout = q
+        sys.stderr = q
         display = StdoutDisplay(q)
         display.start()
         sleep(2)
-
+    sys.stderr.write("foo")
     _clone_pull_and_checkout(config)
 
     plan = Plan(config)

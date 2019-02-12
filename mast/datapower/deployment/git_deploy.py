@@ -1294,7 +1294,7 @@ saved after the deployment is complete
         display = StdoutDisplay(q)
         display.start()
         sleep(2)
-    sys.stderr.write("foo")
+
     _clone_pull_and_checkout(config)
 
     plan = Plan(config)

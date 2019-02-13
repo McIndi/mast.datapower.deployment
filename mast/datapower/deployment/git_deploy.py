@@ -15,6 +15,7 @@ from functools import partial
 from collections import OrderedDict, defaultdict
 import xml.etree.cElementTree as etree
 from os.path import exists
+import ntpath
 import binascii
 import logging
 import subprocess
@@ -1050,6 +1051,7 @@ def parse_config(appliances, credentials, environment, service, check_hostname, 
         "credentials": [],
         "domains": [],
         "environment": environment,
+        "global": dict(config.items("global")),
     }
     _environment = datapower.Environment(
         appliances,
@@ -1100,7 +1102,10 @@ def _prepare_output_directories(config, out_dir):
         out_dir = os.path.join(os.environ["MAST_HOME"], "tmp", "deployment-results")
     config["out_dir"] = out_dir
     config["audit_dir"] = os.path.join(out_dir, "audit")
-    config["repo_dir"] = os.path.join(out_dir, config["service"])
+    config["repo_dir"] = os.path.join(
+        config["global"]["clone_dirs"],
+        ntpath.normpath(ntpath.basename(config["repo"])),
+    )
 
     # Create the out and audit directories if needed
     if not os.path.exists(config["out_dir"]):
@@ -1109,6 +1114,9 @@ def _prepare_output_directories(config, out_dir):
     if not os.path.exists(config["audit_dir"]):
         log.info("'{}' does not exist, creating...".format(config["audit_dir"]))
         os.makedirs(config["audit_dir"])
+    if not os.path.exists(config["global"]["clone_dirs"]):
+        log.info("'{}' does not exist, creating...".format(config["global"]["clone_dirs"]))
+        os.makedirs(config["global"]["clone_dirs"])
 
 
 def _initialize_logging(config):
@@ -1144,10 +1152,11 @@ def _clone_pull_and_checkout(config):
     """Either pull latest changes or clone the remote repository
     """
     log = make_logger("mast.datapower.deployment.git-deploy")
+    git = config["global"]["git_executable"]
     if exists(config["repo_dir"]):
         log.info("Existing local repository found, pulling latest changes")
         with working_directory(config["repo_dir"]):
-            out, err = system_call("git pull")
+            out, err = system_call("{} pull".format(git))
     else:
         _repo = config["repo"]
         if "git-credentials" in config:
@@ -1161,20 +1170,26 @@ def _clone_pull_and_checkout(config):
             ) + "@"
             _repo = config["repo"].replace(_remove_this, "")
         log.info("cloning repo '{}' to '{}'".format(_repo, config["repo_dir"]))
-        out, err = system_call("git clone {} {}".format(config["repo"], config["repo_dir"]))
+        out, err = system_call("{} clone {} {}".format(git, config["repo"], config["repo_dir"]))
     print(out)
     print(err)
     log.info("stdout from git: '{}'".format(out))
-    log.info("stderr from git: '{}'".format(err))            
+    log.info("stderr from git: '{}'".format(err)) 
     # If commit is provided, perform a git checkout
     if config["commit"]:
         with working_directory(config["repo_dir"]):
             log.info("performing 'git checkout {}'".format(config["commit"]))
-            out, err = system_call("git checkout {}".format(config["commit"]))
+            out, err = system_call("{} checkout {}".format(git, config["commit"]))
         print(out)
         print(err)
         log.info("stdout from git checkout: '{}'".format(out))
         log.info("stderr from git checkout: '{}'".format(err))
+    # Copy the repo at the state of deployment to out_dir for auditing purposes
+    dst = os.path.join(
+        config["out_dir"],
+        ntpath.normpath(ntpath.basename(config["repo"])),
+    )
+    shutil.copytree(config["repo_dir"], dst)
 
 def git_deploy(
         appliances=[],
@@ -1258,7 +1273,14 @@ saved after the deployment is complete
     log = make_logger("mast.datapower.deployment.git-deploy")
 
     check_hostname = not no_check_hostname
-    config = parse_config(appliances, credentials, environment, service, check_hostname, timeout)
+    config = parse_config(
+        appliances, 
+        credentials, 
+        environment, 
+        service, 
+        check_hostname, 
+        timeout,
+    )
     config.update(
         {
             "allow_files_in_export": allow_files_in_export,
@@ -1303,6 +1325,7 @@ saved after the deployment is complete
         ret = plan.list_steps()
     else:
         ret = plan.execute()
+
     if web:
         sleep(5)
         display.q.put("END")

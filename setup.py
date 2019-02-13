@@ -8,7 +8,7 @@ def read(fname):
 
 setup(
     name="mast.datapower.deployment",
-    version="2.3.3",
+    version="2.3.4",
     author="Clifford Bressette",
     author_email="cliffordbressette@mcindi.com",
     description=("A utility to help manage deployments for IBM DataPower"),

@@ -50,7 +50,7 @@ class StdoutDisplay(Process):
     def run(self):
         self.gui_root = Tk()
         self.gui_root.title("MAST Git-Deployment Output")
-        self.gui_txt = ScrolledText(self.gui_root)
+        self.gui_txt = Text(self.gui_root)
         self.gui_txt.pack(fill="both", expand=True)
         # self.gui_btn = Button(self.gui_root, text='Close', command=self.close)
         # self.gui_btn.pack()
@@ -65,19 +65,25 @@ class StdoutDisplay(Process):
 # This function takes the text widget and a queue as inputs.
 # It functions by waiting on new data entering the queue, when it 
 # finds new data it will insert it into the text widget 
-def text_catcher(parent, text_widget,queue):
+def text_catcher(parent, text_widget, queue):
     while True:
         msg = queue.get()
-        text_widget.insert(END, msg)
-        text_widget.see("end")
         if msg.strip() == "END":
             break
+        elif msg.strip() == "CLEAR":
+            sleep(1)
+            text_widget.delete("0.0", END)
+            continue
+        sleep(0.1)
+        text_widget.insert(END, msg)
+        text_widget.see(END)
     parent.close()
 
 # This is a Queue that behaves like stdout
 class StdoutQueue(Queue):
     def __init__(self,*args,**kwargs):
         Queue.__init__(self,*args,**kwargs)
+
 
     def write(self,msg):
         self.put(msg)
@@ -314,14 +320,16 @@ class Plan(object):
         for kwargs in self._password_map_aliases:
             print("\t{}".format(kwargs["AliasName"]))
         return ret
+
     def execute(self):
         log = make_logger("mast.datapower.deployment.git-deploy")
         output = OrderedDict()
         for index, action in enumerate(self):
-            print("\nStep {}, {}".format(index, action.name))
+            msg = "\nStep {}, {}".format(index, action.name)
             for k, v in action.kwargs.items():
                 if "password" not in k.lower():
-                    print("\t{}={}".format(k, v))
+                    msg += "\n\t{}={}".format(k, v)
+            print(msg)
             log.info("Executing action '{}'".format(repr(action)))
             response = action()
             try:
@@ -415,6 +423,8 @@ class Plan(object):
                 print("\n\tBackup Saved to '{}'".format(action.resp_file))
             elif "save-config" in action.name:
                 print("\n\tResult: {}".format("\n\t\t".join(response_tree.find(".//{http://www.datapower.com/schemas/management}result").itertext())))
+            if self.config["web"]:
+                print("CLEAR")
         if self.config["web"]:
             return render_results_table(output), render_history(self.environment)
 

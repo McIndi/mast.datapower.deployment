@@ -1001,9 +1001,9 @@ class Action(object):
             resp_file = resp_file.replace(".xml", ".zip")
         self.req_file = req_file
         self.resp_file = resp_file
-        with open(req_file, "w") as fp:
+        with open(req_file, "wb") as fp:
             fp.write(str(self.appliance.request))
-        with open(resp_file, "w") as fp:
+        with open(resp_file, "wb") as fp:
             if "NormalBackup" in self.name:
                 fp.write(ret)
             else:

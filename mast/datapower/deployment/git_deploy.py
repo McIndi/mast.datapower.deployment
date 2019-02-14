@@ -325,7 +325,7 @@ class Plan(object):
         log = make_logger("mast.datapower.deployment.git-deploy")
         output = OrderedDict()
         for index, action in enumerate(self):
-            msg = "\nStep {}, {}".format(index, action.name)
+            msg = "\nStep {}/{}, {}".format(index, len(self._actions), action.name)
             for k, v in action.kwargs.items():
                 if "password" not in k.lower():
                     msg += "\n\t{}={}".format(k, v)

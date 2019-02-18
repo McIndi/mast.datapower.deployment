@@ -676,7 +676,7 @@ class Plan(object):
                         "zip_file": os.path.join(common_config_dir, filename),
                         "source_type": "XML",
                     }
-                    for filename in filter(lambda x: "EMPTY" not in x, os.listdir(common_config_dir))
+                    for filename in filter(lambda x: "EMPTY" not in x, sorted(os.listdir(common_config_dir)))
                 ]
             )
 
@@ -689,7 +689,7 @@ class Plan(object):
                         "zip_file": os.path.join(env_config_dir, filename),
                         "source_type": "XML"
                     }
-                    for filename in filter(lambda x: "EMPTY" not in x, os.listdir(env_config_dir))
+                    for filename in filter(lambda x: "EMPTY" not in x, sorted(os.listdir(env_config_dir)))
                 ]
             )
         return ret

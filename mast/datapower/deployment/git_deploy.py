@@ -14,6 +14,7 @@ from time import sleep, time
 from functools import partial
 from collections import OrderedDict, defaultdict
 import xml.etree.cElementTree as etree
+from zipfile import ZipFile
 from os.path import exists
 import ntpath
 import binascii
@@ -286,7 +287,10 @@ class Plan(object):
             output["Uploads"] = ""
             for filename, kwargs in self._uploads.items():
                 output["Uploads"] += "{} -> {}{}".format(os.path.relpath(kwargs["file_in"], self.config["repo_dir"]), kwargs["file_out"], os.linesep)
-            output["Imports"] = ""
+            if self.deployment_policy is None:
+                output["Imports"] = ""
+            else:        
+                output["Imports"] = "{}{}".format("merged_deployment_policy.xcfg", os.linesep)
             for kwargs in self._imports:
                 output["Imports"] += "{}{}".format(os.path.relpath(kwargs["zip_file"], self.config["repo_dir"]), os.linesep)
             output["Password Map Aliases"] = ""
@@ -314,12 +318,15 @@ class Plan(object):
         for filename, kwargs in self._uploads.items():
             print("\t{} -> {}".format(os.path.relpath(kwargs["file_in"], self.config["repo_dir"]), kwargs["file_out"]))
         print("Imports")
+        if self.deployment_policy is not None:
+            print("\tmerged_deployment_policy.xcfg")
         for kwargs in self._imports:
             print("\t{}".format(os.path.relpath(kwargs["zip_file"], self.config["repo_dir"])))
         print("Password Map Aliases")
         for kwargs in self._password_map_aliases:
             print("\t{}".format(kwargs["AliasName"]))
-        return ret
+        if self.config["web"]:
+            return ret
 
     def execute(self):
         log = make_logger("mast.datapower.deployment.git-deploy")
@@ -527,17 +534,18 @@ class Plan(object):
                 if file_out.startswith("local"):
                     target_dir = "/".join(file_out.split("/")[:-1])
                     if not appliance.directory_exists(target_dir, app_domain, filestore) and target_dir not in self.dirs_to_create[appliance.hostname]:
-                        self.dirs_to_create[appliance.hostname].append(target_dir)
-                        ret.append(
-                            Action(
-                                appliance,
-                                self.config,
-                                "{}-CreateDir".format(appliance.hostname),
-                                appliance.CreateDir,
-                                domain=app_domain,
-                                Dir=target_dir,
+                        if target_dir.rstrip("/") != "local:":
+                            self.dirs_to_create[appliance.hostname].append(target_dir)
+                            ret.append(
+                                Action(
+                                    appliance,
+                                    self.config,
+                                    "{}-CreateDir".format(appliance.hostname),
+                                    appliance.CreateDir,
+                                    domain=app_domain,
+                                    Dir=target_dir,
+                                )
                             )
-                        )
             for filename, kwargs in self._uploads.items():
                 file_out = kwargs["file_out"]
                 if file_out.startswith("pubcert"):
@@ -1021,6 +1029,11 @@ class Action(object):
                     fp.write(self.appliance.last_response)
                 except TypeError:
                     fp.write(str(self.appliance.last_response))
+        if "NormalBackup" in self.name:
+            if ZipFile(resp_file).testzip() is not None:
+                raise RuntimeError("Found corrupt backup for {} {}".format(
+                    self.appliance.hostname, self.kwargs["domain"]
+                ))
         self.config["step_number"] += 1
         return ret
 
@@ -1199,6 +1212,8 @@ def _clone_pull_and_checkout(config):
         config["out_dir"],
         ntpath.normpath(ntpath.basename(config["repo"])),
     )
+    if os.path.exists(dst):
+        shutil.rmtree(dst)
     shutil.copytree(config["repo_dir"], dst)
 
 def git_deploy(

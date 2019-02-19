@@ -91,24 +91,6 @@ class StdoutQueue(Queue):
 
     def flush(self):
         sys.__stdout__.flush()
-#BUFFER = []
-#def print(s):
-#    log = make_logger("mast.datapower.deployment.results")
-#    global BUFFER
-#    BUFFER.append(s)
-#    wrote = True
-#    for _s in BUFFER:
-#        try:
-#            sys.stdout.write("{}{}".format(_s.rstrip(), os.linesep))
-#            sys.stdout.flush()
-#        except IOError:
-#            wrote = False
-#            break
-#        else:
-#            wrote = True
-#        log.info(_s)
-#    if wrote is True:
-#        BUFFER = []
 
 @contextlib.contextmanager
 def working_directory(path):
